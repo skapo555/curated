@@ -1,6 +1,6 @@
 /* Curated — app shell, router and screens. No framework, no build step. */
 
-import { ITEMS, SOURCES, TOPICS, SOURCE_TYPE_LABEL, imageFor } from './data.js';
+import { ITEMS, SOURCES, TOPICS, SOURCE_TYPE_LABEL, imageFor, CONTENT, loadContent, loadItemDetail } from './data.js';
 import * as S from './store.js';
 
 /* ============================================================ helpers */
@@ -9,7 +9,8 @@ const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 const fmtDur = (sec) => { const m = Math.floor(sec / 60), s = Math.floor(sec % 60); const h = Math.floor(m / 60); return h ? `${h}:${String(m % 60).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${m}:${String(s).padStart(2, '0')}`; };
-const lengthLabel = (item) => item.type === 'video' ? `${Math.round(item.durationSec / 60)} min watch` : `${item.readMinutes} min read`;
+const readable = (item) => item.type === 'video' || item.hasBody !== false;
+const lengthLabel = (item) => item.type === 'video' ? `${Math.round((item.durationSec || 0) / 60) || '?'} min watch` : readable(item) ? `${item.readMinutes} min read` : 'On publisher’s site';
 const relTime = (iso) => {
   const d = (Date.now() - new Date(iso).getTime()) / 60000;
   if (d < 60) return `${Math.max(1, Math.round(d))}m ago`;
@@ -29,7 +30,7 @@ const pct = (item) => Math.min(S.isCompleted(item.id) ? 100 : 99, Math.round(S.p
 const remaining = (item) => {
   const p = S.progressOf(item.id);
   if (item.type === 'video') { const left = Math.round(item.durationSec * (1 - p) / 60); return `${left} min left`; }
-  const left = Math.max(1, Math.round(item.readMinutes * (1 - p))); return `about ${left} min left`;
+  const left = Math.max(1, Math.round((item.readMinutes || 5) * (1 - p))); return `about ${left} min left`;
 };
 const src = (item) => S.sourceById(item.sourceId);
 const srcName = (item) => src(item).short || src(item).name;
@@ -254,7 +255,7 @@ screens.sources = () => {
   const match = (s) => !q || s.name.toLowerCase().includes(q) || s.tagline.toLowerCase().includes(q) || SOURCE_TYPE_LABEL[s.type].toLowerCase().includes(q);
   const followed = all.filter(s => S.isFollowed(s.id) && match(s));
   const discover = all.filter(s => !S.isFollowed(s.id) && match(s));
-  const row = (s) => { const { tone } = imageFor({ img: s.id }); const f = S.isFollowed(s.id); return `<div class="source-row"><div class="avatar ${s.type === 'youtube' ? 'yt' : ''}" style="--tone:${tone}" aria-hidden="true">${esc(s.name[0])}</div><div class="t"><h3>${esc(s.name)}</h3><p>${esc(s.tagline)}</p><div class="type">${SOURCE_TYPE_LABEL[s.type]}</div></div><button class="btn sm ${f ? 'ghost' : 'primary'}" data-follow="${s.id}" aria-pressed="${f}">${f ? 'Following' : 'Follow'}</button></div>`; };
+  const row = (s) => { const { tone } = imageFor({ img: s.id }); const f = S.isFollowed(s.id); const un = s.unavailable; return `<div class="source-row ${un ? 'unavailable' : ''}"><div class="avatar ${s.type === 'youtube' ? 'yt' : ''}" style="--tone:${tone}" aria-hidden="true">${esc(s.name[0])}</div><div class="t"><h3>${esc(s.name)}</h3><p>${esc(s.tagline)}</p><div class="type">${SOURCE_TYPE_LABEL[s.type]}${un ? ` · <span class="warn">Unavailable — ${esc(un)}</span>` : s.metadataOnly ? ' · Headlines only' : ''}</div></div>${un ? '' : `<button class="btn sm ${f ? 'ghost' : 'primary'}" data-follow="${s.id}" aria-pressed="${f}">${f ? 'Following' : 'Follow'}</button>`}</div>`; };
   return pageHead('Sources', 'You decide who you trust. Curated only ever draws from this list.') +
     `<div class="search">${I.search}<input type="search" id="src-q" placeholder="Search sources…" value="${esc(sourceQuery)}" autocomplete="off"></div>
     ${q && !followed.length && !discover.length ? `<div class="empty">No source called “${esc(sourceQuery)}”.<small>Soon you’ll be able to paste any website or channel URL to follow it.</small></div>` : ''}
@@ -281,6 +282,7 @@ screens.settings = () => {
     <div class="group"><h2>Reading text size</h2><div class="options" role="radiogroup">${opt('textSize', 's', 'Smaller')}${opt('textSize', 'm', 'Default')}${opt('textSize', 'l', 'Larger')}</div></div>
     <div class="group"><h2>Appearance</h2><div class="options" role="radiogroup">${opt('theme', 'system', 'Match system')}${opt('theme', 'light', 'Light')}${opt('theme', 'dark', 'Dark')}</div></div>
     <div class="group"><h2>Library</h2><div class="options"><a class="opt link" href="#/reading"><span>Currently Reading</span><span class="chev"></span></a><a class="opt link" href="#/archive"><span>Archive</span><span class="chev"></span></a></div></div>
+    ${CONTENT.live ? `<div class="group"><h2>Content</h2><div class="options"><div class="opt"><span>Last refreshed<small>${relTime(CONTENT.generatedAt)} · ${SOURCES.filter(x => !x.unavailable).length} sources · keeps ${CONTENT.windowDays} days</small></span></div></div></div>` : ''}
     <div class="group"><h2>Prototype</h2><div class="options"><button class="opt danger" id="reset">Reset all reading data</button></div><p class="desc" style="margin-top:8px">Clears progress, saves, notes and reactions on this device. Notes never leave your browser.</p></div>
     <div class="about"><strong>Decide less. Read more.</strong>Curated shows you three things worth your time from the sources you chose — and nothing you didn’t ask for.</div>`;
 };
@@ -356,15 +358,16 @@ screens.item = (id) => {
 function articleHTML(item) {
   const p = S.progressOf(item.id);
   const topics = item.topics.map(t => S.topicById(t).name).join(' · ');
-  const body = item.body.map(b => b.t === 'p' ? `<p>${esc(b.text)}</p>` : b.t === 'h2' ? `<h2>${esc(b.text)}</h2>` : `<blockquote>${esc(b.text)}</blockquote>`).join('');
-  return readerTopHTML(item) + `<article class="article">
-    ${imgHTML(item, 'hero r-3x2', 1200, 800)}
+  const hasBody = Array.isArray(item.body) && item.body.length > 0;
+  const body = hasBody ? item.body.map(b => b.t === 'p' ? `<p>${esc(b.text)}</p>` : b.t === 'h2' ? `<h2>${esc(b.text)}</h2>` : `<blockquote>${esc(b.text)}</blockquote>`).join('') : '';
+  const handoff = hasBody ? '' : `<div class="handoff"><p>${esc(src(item).name)} publishes this piece on its own site${src(item).metadataOnly ? ' — it’s behind their paywall, so Curated shows you the summary and hands you across' : ''}.</p><a class="btn primary" href="${item.url}" target="_blank" rel="noopener">Read on ${esc(src(item).name)} ${I.ext.replace('<svg', '<svg style="width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.8"')}</a></div>`;
+  return readerTopHTML(item) + `<article class="article ${hasBody ? '' : 'handoff-mode'}">
+    ${imgHTML(item, hasBody ? 'hero r-3x2' : 'hero r-16x9', 1200, 800)}
     <div class="kicker-row"><span>${esc(src(item).name)}</span><span class="topic">${esc(topics)}</span></div>
     <h1>${esc(item.title)}</h1>
     <p class="dek">${esc(item.dek)}</p>
-    <div class="byline">${item.author ? `<b>${esc(item.author)}</b><span class="dot">·</span>` : ''}<span>${relTime(item.publishedAt)}</span><span class="dot">·</span><span>${item.readMinutes} min read</span>${p > 0.04 && !S.isCompleted(item.id) ? `<span class="dot">·</span><span class="hint-cont">Resuming at ${pct(item)}%</span>` : ''}</div>
-    <div class="body" id="body">${body}</div>
-    <div class="body-end"><span>End</span></div>
+    <div class="byline">${item.author ? `<b>${esc(item.author)}</b><span class="dot">·</span>` : ''}<span>${relTime(item.publishedAt)}</span>${hasBody ? `<span class="dot">·</span><span>${item.readMinutes} min read</span>` : ''}${hasBody && p > 0.04 && !S.isCompleted(item.id) ? `<span class="dot">·</span><span class="hint-cont">Resuming at ${pct(item)}%</span>` : ''}</div>
+    ${hasBody ? `<div class="body" id="body">${body}</div><div class="body-end"><span>End</span></div>` : handoff}
     ${finishHTML(item)}
     <div class="publisher"><div class="t"><b>${esc(src(item).name)}</b><br>Read this piece on the publisher’s site.</div><a class="btn ghost sm" href="${item.url}" target="_blank" rel="noopener">Open ${I.ext.replace('<svg', '<svg style="width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.8"')}</a></div>
     ${notesHTML(item)}
@@ -373,13 +376,18 @@ function articleHTML(item) {
 
 function videoHTML(item) {
   const p = S.progressOf(item.id); const pos = p * item.durationSec;
+  const real = !!item.youtubeId;
+  const player = real
+    ? `<div class="player embed" id="player"><iframe id="yt" src="https://www.youtube-nocookie.com/embed/${esc(item.youtubeId)}?start=${Math.floor(pos)}&rel=0&modestbranding=1" title="${esc(item.title)}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>`
+    : `<div class="player" id="player">${imgHTML(item, 'r-16x9', 1280, 720)}<button class="playbtn" id="play" aria-label="Play"><span>${I.play.replace('<svg', '<svg class="ic-play"')}</span></button></div>`;
+  const dur = item.durationSec || 0;
   return readerTopHTML(item) + `<article class="video">
-    <div class="player" id="player">${imgHTML(item, 'r-16x9', 1280, 720)}<button class="playbtn" id="play" aria-label="Play"><span>${I.play.replace('<svg', '<svg class="ic-play"')}</span></button></div>
-    <div class="scrub"><span id="t-cur">${fmtDur(pos)}</span><input type="range" id="scrub" min="0" max="${item.durationSec}" step="1" value="${Math.round(pos)}" style="--pct:${p * 100}%" aria-label="Playback position"><span>${fmtDur(item.durationSec)}</span></div>
-    <p class="mock-note">Prototype player — press play to simulate watching, or drag to scrub.</p>
+    ${player}
+    <div class="scrub"><span id="t-cur">${fmtDur(pos)}</span><input type="range" id="scrub" min="0" max="${dur || 1}" step="1" value="${Math.round(pos)}" style="--pct:${p * 100}%" aria-label="${real ? 'Where you’re up to' : 'Playback position'}"><span>${dur ? fmtDur(dur) : '–:––'}</span></div>
+    <p class="mock-note">${real ? 'Drag to mark where you’re up to — Curated remembers it and resumes the video there.' : 'Prototype player — press play to simulate watching, or drag to scrub.'}</p>
     <div class="video-meta"><h1>${esc(item.title)}</h1><div class="byline"><b>${esc(src(item).name)}</b><span>·</span><span>${relTime(item.publishedAt)}</span><span>·</span><span>${Math.round(item.durationSec / 60)} min</span></div></div>
-    <p class="desc">${esc(item.description)}</p>
-    <div class="chapters" id="chapters"><div class="kicker" style="margin-bottom:6px">Chapters</div>${item.chapters.map(([t, name]) => `<button data-t="${t}"><span class="ts">${fmtDur(t)}</span><span>${esc(name)}</span></button>`).join('')}</div>
+    <p class="desc">${esc(item.description || item.dek || '')}</p>
+    ${(item.chapters || []).length ? `<div class="chapters" id="chapters"><div class="kicker" style="margin-bottom:6px">Chapters</div>${item.chapters.map(([t, name]) => `<button data-t="${t}"><span class="ts">${fmtDur(t)}</span><span>${esc(name)}</span></button>`).join('')}</div>` : ''}
     ${finishHTML(item)}
     <div class="publisher"><div class="t"><b>${esc(src(item).name)}</b><br>Watch on YouTube.</div><a class="btn ghost sm" href="${item.url}" target="_blank" rel="noopener">Open ${I.ext.replace('<svg', '<svg style="width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.8"')}</a></div>
     ${notesHTML(item)}
@@ -487,6 +495,7 @@ function maybeComplete(id, root) {
 function mountArticle(root, item) {
   const body = $('#body', root);
   const bar = $('#rp', root);
+  if (!body) { reader = { id: item.id, cleanup: () => {} }; return; }
   // Restore position, then track the furthest point reached.
   const p = S.progressOf(item.id);
   requestAnimationFrame(() => {
@@ -518,14 +527,15 @@ function mountArticle(root, item) {
 }
 
 function mountVideo(root, item) {
-  const player = $('#player', root), play = $('#play', root), scrub = $('#scrub', root), cur = $('#t-cur', root), bar = $('#rp', root);
+  const player = $('#player', root), play = $('#play', root), scrub = $('#scrub', root), cur = $('#t-cur', root), bar = $('#rp', root), yt = $('#yt', root);
+  if (!item.durationSec) { reader = { id: item.id, cleanup: () => {} }; return; }
   let pos = S.progressOf(item.id) * item.durationSec, playing = false, timer = null, lastSave = 0;
   const RATE = 30; // simulated seconds of video per real second — a prototype, not a player
   const paint = () => {
     const frac = pos / item.durationSec;
     scrub.value = Math.round(pos); scrub.style.setProperty('--pct', `${frac * 100}%`); cur.textContent = fmtDur(pos); bar.style.width = `${frac * 100}%`;
     $$('#chapters button', root).forEach(b => { b.classList.remove('active'); });
-    const ch = item.chapters.filter(c => c[0] <= pos).pop(); if (ch) { const b = $(`#chapters button[data-t="${ch[0]}"]`, root); b && b.classList.add('active'); }
+    const ch = (item.chapters || []).filter(c => c[0] <= pos).pop(); if (ch) { const b = $(`#chapters button[data-t="${ch[0]}"]`, root); b && b.classList.add('active'); }
   };
   const setPos = (v, persist = true) => {
     pos = Math.min(item.durationSec, Math.max(0, v)); paint();
@@ -534,10 +544,11 @@ function mountVideo(root, item) {
   };
   const start = () => { playing = true; player.classList.add('playing'); play.querySelector('span').innerHTML = I.pause; play.setAttribute('aria-label', 'Pause'); timer = setInterval(() => { const persist = Date.now() - lastSave > 1500; if (persist) lastSave = Date.now(); setPos(pos + RATE / 4, persist); }, 250); };
   const stop = () => { playing = false; player.classList.remove('playing'); play.querySelector('span').innerHTML = I.play.replace('<svg', '<svg class="ic-play"'); play.setAttribute('aria-label', 'Play'); clearInterval(timer); timer = null; S.setProgress(item.id, pos / item.durationSec); };
-  play.onclick = () => { haptic(); playing ? stop() : start(); };
+  if (play) play.onclick = () => { haptic(); playing ? stop() : start(); };
+  const seekEmbed = () => { if (yt) yt.src = yt.src.replace(/([?&])start=\d+/, `$1start=${Math.floor(pos)}`) + (yt.src.includes('autoplay=1') ? '' : '&autoplay=1'); };
   scrub.oninput = () => setPos(Number(scrub.value), false);
-  scrub.onchange = () => { S.setProgressExact(item.id, pos / item.durationSec); };
-  $$('#chapters button', root).forEach(b => b.onclick = () => { setPos(Number(b.dataset.t)); S.setProgressExact(item.id, pos / item.durationSec); });
+  scrub.onchange = () => { S.setProgressExact(item.id, pos / item.durationSec); seekEmbed(); };
+  $$('#chapters button', root).forEach(b => b.onclick = () => { setPos(Number(b.dataset.t)); S.setProgressExact(item.id, pos / item.durationSec); seekEmbed(); });
   paint();
   reader = { id: item.id, cleanup: () => { clearInterval(timer); } };
 }
@@ -561,6 +572,15 @@ function render() {
   $('#sheet').hidden = true;
   const fn = screens[name] || screens.home;
   const root = $('#main');
+  if (name === 'item') {
+    const it = S.itemById(arg);
+    if (it && it.body == null && it.bodyUrl) {
+      document.body.classList.add('reading');
+      root.innerHTML = readerTopHTML(it) + `<div class="loading"><div class="img r-3x2 hero" style="--tone:${imageFor(it).tone}"></div><h1>${esc(it.title)}</h1><p class="calm">Fetching the piece…</p></div>`;
+      loadItemDetail(it).then(() => { if (location.hash === hash) render(); });
+      return;
+    }
+  }
   root.innerHTML = fn(arg);
   if (fn.mount) fn.mount(root);
   $$('.img img', root).forEach(im => { if (im.complete && im.naturalWidth > 0) im.classList.add('loaded'); });
@@ -580,10 +600,14 @@ function applyPrefs() {
   $$('meta[name="theme-color"]').forEach(m => m.setAttribute('content', dark ? '#121110' : '#f6f4ef'));
 }
 
-window.addEventListener('hashchange', render);
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyPrefs);
 applyPrefs();
-render();
+$('#main').innerHTML = '<div class="boot"><span class="wordmark">curated</span></div>';
+Promise.race([loadContent(), new Promise(r => setTimeout(() => r(false), 6000))]).then((live) => {
+  S.syncSources(!!live);
+  window.addEventListener('hashchange', render);
+  render();
+});
 
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
   window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));

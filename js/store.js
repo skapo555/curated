@@ -63,6 +63,18 @@ export const subscribe = (fn) => { listeners.add(fn); return () => listeners.del
 export const getState = () => state;
 export const settings = () => state.settings;
 
+/* Call after live content replaces SOURCES so new sources get a follow default. */
+export function syncSources(live = false) {
+  let changed = false;
+  if (live && !state.liveSynced) {
+    // First time real sources arrive: start from their defaults, not the mock era's follows.
+    for (const s of SOURCES) state.followed[s.id] = s.followed;
+    state.liveSynced = true; changed = true;
+  }
+  for (const s of SOURCES) if (!(s.id in state.followed)) { state.followed[s.id] = s.followed; changed = true; }
+  if (changed) save();
+}
+
 export function resetAll() {
   state = seed(DEFAULTS());
   save();

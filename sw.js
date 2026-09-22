@@ -1,6 +1,6 @@
 /* Minimal app-shell cache. Network-first for the shell so edits show up
    during development; cached copy serves the app offline. */
-const CACHE = 'curated-shell-v11';
+const CACHE = 'curated-shell-v12';
 const SHELL = ['./', './index.html', './css/styles.css', './js/app.js', './js/store.js', './js/data.js', './manifest.webmanifest', './icons/icon.svg'];
 
 self.addEventListener('install', (e) => {

@@ -1,2 +1,4 @@
 scratch/
 .DS_Store
+ingest.log
+__pycache__/

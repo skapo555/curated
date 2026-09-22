@@ -543,3 +543,17 @@ select.native { position: absolute; inset: 0; opacity: 0; width: 100%; height: 1
   .sheet { border-radius: 20px; margin-bottom: 40px; }
   .sheet-backdrop { align-items: center; }
 }
+
+/* ---------- Live content states ---------- */
+.boot { min-height: 70dvh; display: grid; place-items: center; animation: fade .4s var(--ease); }
+.loading h1 { font-family: var(--serif); font-size: 34px; line-height: 1.12; letter-spacing: -.015em; font-weight: 500; margin-top: 18px; }
+.loading .hero { margin: 18px calc(-1 * var(--gutter)) 0; border-radius: 0; background: var(--tone); opacity: .5; }
+.handoff-mode h1 { font-size: 30px; }
+.handoff { margin-top: 22px; padding: 22px; border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow); text-align: center; }
+.handoff p { font-family: var(--serif); font-size: 17px; line-height: 1.45; color: var(--ink-2); margin-bottom: 16px; }
+.handoff .btn { padding: 13px 22px; font-size: 15px; }
+.player.embed { aspect-ratio: 16 / 9; background: #000; }
+.player.embed iframe { width: 100%; height: 100%; border: 0; display: block; }
+.source-row.unavailable { opacity: .6; }
+.source-row .warn { color: var(--accent); text-transform: none; letter-spacing: 0; font-weight: 500; }
+@media (min-width: 1024px) { .loading .hero { margin-left: 0; margin-right: 0; border-radius: var(--radius); } }

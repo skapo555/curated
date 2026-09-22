@@ -377,11 +377,52 @@ export const ITEMS = [
 /* Resolve relative times to absolute timestamps once. */
 for (const it of ITEMS) it.publishedAt = ago(it.hoursAgo);
 
-/* Image helper: deterministic photography placeholder plus a warm tone
-   used as the backdrop while the image loads (or offline). */
+/* Image helper. Real items carry their publisher's image URL; mock items get a
+   deterministic placeholder. Either way a warm tone backs the image while it loads. */
 const TONES = ['#8a6f5c', '#5c6f7a', '#6f7a5c', '#7a5c6a', '#5c5c7a', '#7a6f5c', '#5c7a73'];
 export function imageFor(item, w = 900, h = 600) {
-  const seed = `curated-${item.img}`;
+  const seed = `curated-${item.img || item.id}`;
   let n = 0; for (const ch of seed) n = (n * 31 + ch.charCodeAt(0)) >>> 0;
-  return { src: `https://picsum.photos/seed/${seed}/${w}/${h}`, tone: TONES[n % TONES.length] };
+  const tone = TONES[n % TONES.length];
+  if (item.image) return { src: item.image, tone };
+  if (!item.img) return { src: '', tone };
+  return { src: `https://picsum.photos/seed/${seed}/${w}/${h}`, tone };
+}
+
+/* ---------- Live content ----------
+   data/index.json is produced by ingest/ingest.py on a schedule. When it loads,
+   it replaces the mock sources and items in place; if it can't (offline on first
+   run, or the double-clicked single file), the mock content above stays. */
+export const CONTENT = { live: false, generatedAt: null, windowDays: 30 };
+
+export async function loadContent() {
+  let idx = window.__CURATED_INDEX__ || null;
+  if (!idx) {
+    try {
+      const r = await fetch(`data/index.json?t=${Math.floor(Date.now() / 300000)}`, { cache: 'no-cache' });
+      if (!r.ok) throw new Error(r.status);
+      idx = await r.json();
+    } catch (e) { return false; }
+  }
+  if (!idx || !Array.isArray(idx.items) || !idx.items.length) return false;
+  SOURCES.length = 0;
+  for (const s of idx.sources) SOURCES.push({ ...s, followed: !s.unavailable });
+  ITEMS.length = 0;
+  for (const it of idx.items) ITEMS.push({ ...it, body: null, bodyUrl: `data/items/${it.id}.json` });
+  CONTENT.live = true; CONTENT.generatedAt = idx.generatedAt; CONTENT.windowDays = idx.windowDays || 30;
+  return true;
+}
+
+/* Fetch an item's body (article blocks, or video description + chapters) on demand. */
+export async function loadItemDetail(item) {
+  if (item.body !== null && item.body !== undefined) return item;
+  if (!item.bodyUrl) return item;
+  try {
+    const r = await fetch(item.bodyUrl, { cache: 'no-cache' });
+    if (!r.ok) throw new Error(r.status);
+    const d = await r.json();
+    if (item.type === 'video') { item.description = d.description || ''; item.chapters = d.chapters || []; item.transcript = d.transcript || null; item.body = []; }
+    else item.body = Array.isArray(d.body) ? d.body : [];
+  } catch (e) { item.body = []; item.bodyError = true; }
+  return item;
 }

@@ -29,7 +29,9 @@ html = html.replace('<link rel="manifest" href="manifest.webmanifest">\n', '')
 html = html.replace('href="icons/icon.svg"', f'href="data:image/svg+xml;base64,{svg}"')
 html = html.replace('href="icons/icon-180.png"', f'href="data:image/png;base64,{icon}"')
 html = html.replace('<link rel="stylesheet" href="css/styles.css">', '<style>\n' + css + '\n</style>')
-html = html.replace('<script type="module" src="js/app.js"></script>', '<script>\n' + js + '\n</script>')
+index_path = root / 'data/index.json'
+inline_index = ('<script>window.__CURATED_INDEX__ = ' + index_path.read_text() + ';</script>\n') if index_path.exists() else ''
+html = html.replace('<script type="module" src="js/app.js"></script>', inline_index + '<script>\n' + js + '\n</script>')
 
 out = root.parent / 'Curated.html'
 out.write_text(html)
