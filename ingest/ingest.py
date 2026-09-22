@@ -362,6 +362,9 @@ def main():
             title = html.unescape(e["title"]).strip()
             if is_video:
                 dur = video_details(e["yt_id"])
+                # hqdefault is 4:3 with black bars; hq720 is a true 16:9 frame
+                if e["image"] and "/hqdefault.jpg" in e["image"]:
+                    e["image"] = e["image"].replace("/hqdefault.jpg", "/hq720.jpg")
                 desc = e["summary"] or ""
                 detail = {"id": iid, "type": "video", "description": clean_description(desc), "chapters": parse_chapters(desc), "transcript": None}
                 item = {

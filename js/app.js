@@ -91,7 +91,12 @@ function celebrate() {
 
 function imgHTML(item, ratio = 'r-3x2', w = 900, h = 600, extra = '') {
   const { src: url, tone } = imageFor(item, w, h);
-  return `<div class="img ${ratio}" style="--tone:${tone}"><img src="${url}" alt="" loading="lazy" decoding="async" onload="this.classList.add('loaded')">${extra}</div>`;
+  const name = src(item) ? src(item).name : '';
+  // The monogram sits underneath: it shows when a publisher has no image, or
+  // blocks hotlinking (ABC's CDN does), instead of an empty coloured block.
+  const ph = `<span class="ph" aria-hidden="true"><b>${esc(name.slice(0, 1))}</b><i>${esc(name)}</i></span>`;
+  const img = url ? `<img src="${esc(url)}" alt="" loading="lazy" decoding="async" onload="this.classList.add('loaded')" onerror="this.remove()">` : '';
+  return `<div class="img ${ratio}" style="--tone:${tone}">${ph}${img}${extra}</div>`;
 }
 const videoExtras = (item, play = false) => `<span class="dur">${fmtDur(item.durationSec)}</span>${play ? `<span class="play"><span>${I.play}</span></span>` : ''}`;
 
@@ -118,7 +123,7 @@ function continueCard(item) {
   const p = S.progressOf(item.id);
   const isVideo = item.type === 'video';
   return `<a class="continue" href="#/item/${item.id}">
-    ${imgHTML(item, isVideo ? 'r-16x9' : 'r-3x2', 1000, isVideo ? 563 : 667, isVideo ? videoExtras(item) : '')}
+    ${imgHTML(item, 'r-16x9', 1000, 563, isVideo ? videoExtras(item) : '')}
     <div class="continue-body">
       <div class="meta"><span class="src">${esc(src(item).name)}</span><span>${isVideo ? 'Watching' : 'Reading'}</span></div>
       <h3>${esc(item.title)}</h3>
@@ -133,7 +138,7 @@ function pickCard({ item, reason }, n) {
   const isVideo = item.type === 'video';
   const meta = `<div class="meta"><span class="src">${esc(src(item).name)}</span><span>${lengthLabel(item)}</span></div>`;
   if (n === 1) {
-    return `<a class="pick pick-lead" href="#/item/${item.id}">${imgHTML(item, isVideo ? 'r-16x9' : 'r-3x2', 1000, isVideo ? 563 : 667, isVideo ? videoExtras(item, true) : '')}
+    return `<a class="pick pick-lead" href="#/item/${item.id}">${imgHTML(item, 'r-16x9', 1000, 563, isVideo ? videoExtras(item, true) : '')}
       <span class="n">${n}.</span>${meta}<h3>${esc(item.title)}</h3><p class="dek">${esc(item.dek)}</p><span class="reason">${esc(reason)}</span></a>`;
   }
   return `<a class="pick pick-split" href="#/item/${item.id}"><div><span class="n">${n}.</span>${meta}<h3>${esc(item.title)}</h3><p class="dek">${esc(item.dek)}</p><span class="reason">${esc(reason)}</span></div>${imgHTML(item, 'r-1x1', 400, 400, isVideo ? `<span class="dur">${fmtDur(item.durationSec)}</span>` : '')}</a>`;
@@ -362,7 +367,7 @@ function articleHTML(item) {
   const body = hasBody ? item.body.map(b => b.t === 'p' ? `<p>${esc(b.text)}</p>` : b.t === 'h2' ? `<h2>${esc(b.text)}</h2>` : `<blockquote>${esc(b.text)}</blockquote>`).join('') : '';
   const handoff = hasBody ? '' : `<div class="handoff"><p>${esc(src(item).name)} publishes this piece on its own site${src(item).metadataOnly ? ' — it’s behind their paywall, so Curated shows you the summary and hands you across' : ''}.</p><a class="btn primary" href="${item.url}" target="_blank" rel="noopener">Read on ${esc(src(item).name)} ${I.ext.replace('<svg', '<svg style="width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.8"')}</a></div>`;
   return readerTopHTML(item) + `<article class="article ${hasBody ? '' : 'handoff-mode'}">
-    ${imgHTML(item, hasBody ? 'hero r-3x2' : 'hero r-16x9', 1200, 800)}
+    ${imgHTML(item, 'hero r-16x9', 1200, 675)}
     <div class="kicker-row"><span>${esc(src(item).name)}</span><span class="topic">${esc(topics)}</span></div>
     <h1>${esc(item.title)}</h1>
     <p class="dek">${esc(item.dek)}</p>
