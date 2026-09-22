@@ -3,9 +3,13 @@
 
 import { ITEMS, SOURCES, TOPICS } from './data.js';
 
-const KEY = 'curated.state.v1';
+const KEY = 'curated.state.v2';
+const OLD_KEY = 'curated.state.v1';
 const DAY = 86400 * 1000;
 
+/* Every user-owned value carries the moment it changed, so two devices can be
+   merged without a server arbitrating. `at` mirrors the shape of the data:
+   at.items[id][field], at.followed[sourceId], at.notes[id], at.settings[key]. */
 const DEFAULTS = () => ({
   progress: {},   // itemId -> 0..1 (furthest point reached)
   opened: {},     // itemId -> last-opened timestamp
@@ -21,20 +25,53 @@ const DEFAULTS = () => ({
     textSize: 'm',        // s | m | l
   },
   liveSynced: false,
+  at: { items: {}, followed: {}, notes: {}, settings: {} },
+  syncedAt: 0,          // server time of the last successful pull
 });
 
 let state = load();
 
 function load() {
   try {
-    const raw = localStorage.getItem(KEY);
+    const raw = localStorage.getItem(KEY) || migrateV1();
     if (raw) {
       const parsed = JSON.parse(raw);
-      const merged = { ...DEFAULTS(), ...parsed, settings: { ...DEFAULTS().settings, ...(parsed.settings || {}) } };
-      return merged;
+      const d = DEFAULTS();
+      return { ...d, ...parsed, settings: { ...d.settings, ...(parsed.settings || {}) }, at: { ...d.at, ...(parsed.at || {}) } };
     }
   } catch (e) { /* fall through to fresh state */ }
   return DEFAULTS();
+}
+
+/* v1 had no timestamps. Stamp everything as "changed long ago" so that any
+   later edit on another device wins, but nothing is lost. */
+function migrateV1() {
+  const raw = localStorage.getItem(OLD_KEY);
+  if (!raw) return null;
+  try {
+    const v1 = JSON.parse(raw);
+    const t = 1;
+    const at = { items: {}, followed: {}, notes: {}, settings: {} };
+    const stamp = (id, field) => { (at.items[id] = at.items[id] || {})[field] = t; };
+    for (const id of Object.keys(v1.progress || {})) stamp(id, 'progress');
+    for (const id of Object.keys(v1.completed || {})) stamp(id, 'completed');
+    for (const id of Object.keys(v1.saved || {})) stamp(id, 'saved');
+    for (const id of Object.keys(v1.feedback || {})) stamp(id, 'feedback');
+    for (const id of Object.keys(v1.opened || {})) stamp(id, 'opened');
+    for (const id of Object.keys(v1.notes || {})) at.notes[id] = t;
+    for (const k of Object.keys(v1.followed || {})) at.followed[k] = t;
+    for (const k of Object.keys(v1.settings || {})) at.settings[k] = t;
+    const v2 = JSON.stringify({ ...v1, at, syncedAt: 0 });
+    localStorage.setItem(KEY, v2);
+    localStorage.removeItem(OLD_KEY);
+    return v2;
+  } catch (e) { return null; }
+}
+
+const now = () => Date.now();
+function touch(kind, id, field) {
+  if (kind === 'items') (state.at.items[id] = state.at.items[id] || {})[field] = now();
+  else state.at[kind][id] = now();
 }
 
 function save() {
@@ -211,50 +248,178 @@ function reasonFor({ item, topicBoost, sourceBoost }, aff) {
 /* ---------- Mutations ---------- */
 export function open(id) {
   state.opened[id] = Date.now();
+  touch('items', id, 'opened');
   save();
 }
 
 export function setProgress(id, p) {
   const prev = state.progress[id] || 0;
   const next = Math.max(prev, Math.min(1, Math.max(0, p)));
-  if (next !== prev) { state.progress[id] = next; save(); }
+  if (next !== prev) { state.progress[id] = next; touch('items', id, 'progress'); save(); }
 }
 
 export function setProgressExact(id, p) {
-  state.progress[id] = Math.min(1, Math.max(0, p)); save();
+  state.progress[id] = Math.min(1, Math.max(0, p)); touch('items', id, 'progress'); save();
 }
 
 export function complete(id) {
   state.completed[id] = Date.now();
   state.progress[id] = 1;
+  touch('items', id, 'completed'); touch('items', id, 'progress');
   save();
 }
 
 export function uncomplete(id) {
   delete state.completed[id];
   state.progress[id] = 0;
+  touch('items', id, 'completed'); touch('items', id, 'progress');
   save();
 }
 
 export function toggleSaved(id) {
   if (state.saved[id]) delete state.saved[id]; else state.saved[id] = Date.now();
+  touch('items', id, 'saved');
   save(); return !!state.saved[id];
 }
 
 export function setFeedback(id, fb) {
   if (state.feedback[id] === fb) delete state.feedback[id]; else state.feedback[id] = fb;
+  touch('items', id, 'feedback');
   save(); return state.feedback[id] || null;
 }
 
 export function setNote(id, text) {
   if (text.trim()) state.notes[id] = text; else delete state.notes[id];
+  touch('notes', id);
   save();
 }
 
 export function setFollowed(sourceId, yes) {
-  state.followed[sourceId] = !!yes; save();
+  state.followed[sourceId] = !!yes; touch('followed', sourceId); save();
 }
 
 export function setSetting(key, value) {
-  state.settings[key] = value; save();
+  state.settings[key] = value; touch('settings', key); save();
 }
+
+/* ============================================================
+   Sync — merging two devices without a server refereeing.
+
+   Rules, chosen so a stale device can never take something away:
+     progress   furthest point wins, regardless of when it was recorded
+     completed  sticky: once finished, it stays finished
+     saved / feedback / followed / settings / opened   most recent change wins
+     notes      most recent wins; if both sides changed since the last sync,
+                the loser is kept as a conflict copy rather than discarded
+   ============================================================ */
+
+const ITEM_FIELDS = ['progress', 'completed', 'saved', 'feedback', 'opened'];
+
+/* The local state in the shape the server stores. */
+export function snapshot() {
+  const items = {};
+  const add = (id) => (items[id] = items[id] || { item_id: id });
+  for (const [id, v] of Object.entries(state.progress)) add(id).progress = v;
+  for (const [id, v] of Object.entries(state.completed)) add(id).completed_at = v;
+  for (const [id, v] of Object.entries(state.saved)) add(id).saved_at = v;
+  for (const [id, v] of Object.entries(state.feedback)) add(id).feedback = v;
+  for (const [id, v] of Object.entries(state.opened)) add(id).opened_at = v;
+  for (const id of Object.keys(items)) items[id].at = state.at.items[id] || {};
+  return {
+    items: Object.values(items),
+    notes: Object.entries(state.notes).map(([item_id, body]) => ({ item_id, body, at: state.at.notes[item_id] || 0 })),
+    follows: Object.entries(state.followed).map(([source_id, followed]) => ({ source_id, followed, at: state.at.followed[source_id] || 0 })),
+    settings: { ...state.settings },
+    settingsAt: { ...state.at.settings },
+  };
+}
+
+/* Everything changed since the last successful sync — what gets pushed. */
+export function pending(since = state.syncedAt) {
+  const s = snapshot();
+  return {
+    items: s.items.filter(i => Object.values(i.at).some(t => t > since)),
+    notes: s.notes.filter(n => n.at > since),
+    follows: s.follows.filter(f => f.at > since),
+    settings: Object.fromEntries(Object.entries(s.settings).filter(([k]) => (s.settingsAt[k] || 0) > since)),
+    settingsAt: s.settingsAt,
+  };
+}
+
+export function hasPending(since = state.syncedAt) {
+  const p = pending(since);
+  return p.items.length > 0 || p.notes.length > 0 || p.follows.length > 0 || Object.keys(p.settings).length > 0;
+}
+
+/* Fold the server's rows into local state. Returns a summary for logging. */
+export function mergeRemote(remote, { markSynced = 0 } = {}) {
+  const changed = { items: 0, notes: 0, follows: 0, settings: 0, conflicts: 0 };
+  const localAt = (id, f) => (state.at.items[id] || {})[f] || 0;
+
+  for (const r of remote.items || []) {
+    const id = r.item_id, rAt = r.at || {};
+    // progress: furthest wins, so an old device can't rewind you
+    if (r.progress != null && r.progress > (state.progress[id] || 0)) {
+      state.progress[id] = r.progress;
+      (state.at.items[id] = state.at.items[id] || {}).progress = rAt.progress || r.updated_at || 0;
+      changed.items++;
+    }
+    // completed: sticky
+    if (r.completed_at && !state.completed[id]) {
+      state.completed[id] = r.completed_at;
+      state.progress[id] = 1;
+      (state.at.items[id] = state.at.items[id] || {}).completed = rAt.completed || r.updated_at || 0;
+      changed.items++;
+    }
+    // the rest: newest write wins
+    for (const [field, key] of [['saved', 'saved_at'], ['feedback', 'feedback'], ['opened', 'opened_at']]) {
+      const t = rAt[field] || r.updated_at || 0;
+      if (t > localAt(id, field)) {
+        const v = r[key];
+        const bucket = field === 'saved' ? state.saved : field === 'feedback' ? state.feedback : state.opened;
+        if (v == null) delete bucket[id]; else bucket[id] = v;
+        (state.at.items[id] = state.at.items[id] || {})[field] = t;
+        changed.items++;
+      }
+    }
+  }
+
+  for (const r of remote.notes || []) {
+    const id = r.item_id, rAt = r.at || r.updated_at || 0, mine = state.at.notes[id] || 0;
+    if (rAt <= mine) {
+      // Both sides edited since the last sync and mine is newer: keep theirs
+      // rather than silently dropping a thought written on another device.
+      if (mine > (state.syncedAt || 0) && rAt > (state.syncedAt || 0) && r.body && r.body !== state.notes[id]) {
+        state.notes[id] = `${state.notes[id] || ''}\n\n— also written elsewhere —\n${r.body}`;
+        state.at.notes[id] = Date.now();
+        changed.conflicts++;
+      }
+      continue;
+    }
+    if (r.body) state.notes[id] = r.body; else delete state.notes[id];
+    state.at.notes[id] = rAt;
+    changed.notes++;
+  }
+
+  for (const r of remote.follows || []) {
+    const t = r.at || r.updated_at || 0;
+    if (t > (state.at.followed[r.source_id] || 0)) {
+      state.followed[r.source_id] = !!r.followed;
+      state.at.followed[r.source_id] = t;
+      changed.follows++;
+    }
+  }
+
+  const rs = remote.settings || {}, rsAt = remote.settingsAt || {};
+  for (const [k, v] of Object.entries(rs)) {
+    const t = rsAt[k] || remote.settingsUpdatedAt || 0;
+    if (t > (state.at.settings[k] || 0)) { state.settings[k] = v; state.at.settings[k] = t; changed.settings++; }
+  }
+
+  if (markSynced) state.syncedAt = markSynced;
+  save();
+  return changed;
+}
+
+export function markSynced(t) { state.syncedAt = t; save(); }
+export const lastSynced = () => state.syncedAt;

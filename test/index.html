@@ -1,0 +1,14 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>Merge tests</title>
+<style>body{font:14px/1.5 ui-monospace,Menlo,monospace;padding:24px;background:#111;color:#eee}
+.ok{color:#8cbf9d}.no{color:#e0755f}h1{font:600 18px system-ui;margin:0 0 16px}pre{margin:2px 0 10px 22px;color:#888}</style>
+</head><body><h1>Curated — merge rules</h1><div id="out">running…</div>
+<script type="module">
+import { run } from './merge-test.js';
+const rs = run();
+const pass = rs.filter(r => r.ok).length;
+document.getElementById('out').innerHTML =
+  `<p>${pass}/${rs.length} passed</p>` +
+  rs.map(r => `<div class="${r.ok ? 'ok' : 'no'}">${r.ok ? '✓' : '✗'} ${r.name}</div>` +
+    (r.ok ? '' : `<pre>got ${JSON.stringify(r.got)}  want ${JSON.stringify(r.want)}</pre>`)).join('');
+window.__results = rs;
+</script></body></html>
