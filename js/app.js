@@ -364,7 +364,16 @@ function articleHTML(item) {
   const p = S.progressOf(item.id);
   const topics = item.topics.map(t => S.topicById(t).name).join(' · ');
   const hasBody = Array.isArray(item.body) && item.body.length > 0;
-  const body = hasBody ? item.body.map(b => b.t === 'p' ? `<p>${esc(b.text)}</p>` : b.t === 'h2' ? `<h2>${esc(b.text)}</h2>` : `<blockquote>${esc(b.text)}</blockquote>`).join('') : '';
+  // The drop cap only belongs on a proper opening paragraph, never on a short
+  // label like "In short:".
+  let leadDone = false;
+  const body = hasBody ? item.body.map(b => {
+    if (b.t === 'h2') return `<h2>${esc(b.text)}</h2>`;
+    if (b.t === 'quote') return `<blockquote>${esc(b.text)}</blockquote>`;
+    const lead = !leadDone && b.text.length > 120;
+    if (lead) leadDone = true;
+    return `<p${lead ? ' class="lead"' : ''}>${esc(b.text)}</p>`;
+  }).join('') : '';
   const handoff = hasBody ? '' : `<div class="handoff"><p>${esc(src(item).name)} publishes this piece on its own site${src(item).metadataOnly ? ' — it’s behind their paywall, so Curated shows you the summary and hands you across' : ''}.</p><a class="btn primary" href="${item.url}" target="_blank" rel="noopener">Read on ${esc(src(item).name)} ${I.ext.replace('<svg', '<svg style="width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.8"')}</a></div>`;
   return readerTopHTML(item) + `<article class="article ${hasBody ? '' : 'handoff-mode'}">
     ${imgHTML(item, 'hero r-16x9', 1200, 675)}

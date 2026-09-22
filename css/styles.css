@@ -325,7 +325,7 @@ select.native { position: absolute; inset: 0; opacity: 0; width: 100%; height: 1
 
 .body { margin-top: 30px; font-family: var(--serif); font-size: calc(19px * var(--reading-scale)); line-height: 1.58; color: var(--ink); }
 .body p { margin: 0 0 1.35em; hyphens: auto; -webkit-hyphens: auto; }
-.body p:first-of-type::first-letter { float: left; font-size: 3.35em; line-height: .8; padding: .1em .12em 0 0; font-weight: 500; }
+.body p.lead::first-letter { float: left; font-size: 3.35em; line-height: .8; padding: .1em .12em 0 0; font-weight: 500; }
 .body h2 { font-family: var(--serif); font-size: calc(23px * var(--reading-scale)); line-height: 1.25; font-weight: 600; margin: 2em 0 .8em; letter-spacing: -.01em; }
 .body blockquote { margin: 1.8em 0; padding: .2em 0 .2em 1.1em; border-left: 2px solid var(--accent); font-size: calc(22px * var(--reading-scale)); line-height: 1.35; font-style: italic; color: var(--ink-2); }
 .body-end { display: flex; align-items: center; gap: 10px; margin: 8px 0 34px; color: var(--ink-3); }

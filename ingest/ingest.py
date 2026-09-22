@@ -176,6 +176,37 @@ def words_in(blocks):
     return sum(len(b["text"].split()) for b in blocks)
 
 SHARE_PREFIX = re.compile(r"^(listen|copy link|share|print|email|save)(\s+(listen|copy link|share|print|email|save))*\s+", re.I)
+PROMO_PARA = re.compile(r"^(join|subscribe|become a|sign up|support|get \w+ access|register|donate|listen to|follow)\b[^.]{0,160}\b(access|member|membership|newsletter|subscri|supporter|donation|podcast|updates)\b", re.I)
+WP_FEED_TAIL = re.compile(r"\s*The post\b.*?\bappeared first on\b.*$", re.I | re.S)
+
+EMAIL_INVITE = re.compile(r"[\w.+-]+@[\w-]+\.[\w.]+")
+NAV_TOKENS = ("close", "sign in", "log in", "members", "search", "home page", "about us", "contact us",
+              "subscriptions", "advertise", "write for us", "all sections", "skip to content", "menu")
+PROMO_ANY = re.compile(r"\b(gain access to|access to content|become a member|join .{0,40} and gain|start your (free )?trial)\b", re.I)
+
+def is_nav(text):
+    """Menu labels and tagline soup: mostly Capitalised words with almost no
+    sentences, or a run of very short fragments ('National security. For
+    insiders. By insiders.')."""
+    if len(text) < 60: return False
+    words = text.split()
+    if len(words) < 6: return False
+    caps = sum(1 for w in words if w[:1].isupper())
+    sentences = max(1, len(re.findall(r"[.!?](?:\s|$)", text)))
+    if caps / len(words) > 0.55 and sentences <= 1: return True
+    if len(words) / sentences < 6 and caps / len(words) > 0.45: return True
+    # A header bar flattened into one paragraph: several nav labels up front and
+    # no real sentences ("Close Commentary Members … Sign In …").
+    head = text[:120].lower()
+    if sum(1 for tok in NAV_TOKENS if tok in head) >= 2 and len(words) / sentences < 8: return True
+    return False
+
+def similar(a, b):
+    """Word overlap, for spotting a headline repeated as the first paragraph."""
+    wa, wb = set(norm(a).split()), set(norm(b).split())
+    if not wa or not wb: return 0
+    return len(wa & wb) / min(len(wa), len(wb))
+
 CAPTION = re.compile(r"\((?:[^()]*\b(?:getty|unsplash|aap|reuters|afp|ap photo|flickr|wikimedia|shutterstock|supplied|epa|bloomberg)\b[^()]*)\)\s*$", re.I)
 RELATED_STUB = re.compile(r"\b\d{1,2} (january|february|march|april|may|june|july|august|september|october|november|december) 20\d\d\b", re.I)
 NAV_PARA = re.compile(r"^(topics|research|interactives|events|people|support us|home|menu|search)(\s+\w+){0,12}$", re.I)
@@ -196,6 +227,8 @@ def tidy(blocks):
             if len(t) > 300 and b["t"] == "p": skipping = False   # real prose resumes
             else: continue
         if BOILERPLATE.match(t) or NAV_PARA.match(t): continue
+        if b["t"] == "p" and (PROMO_PARA.match(t) or PROMO_ANY.search(t) or is_nav(t)): continue
+        if b["t"] == "p" and len(t) < 300 and EMAIL_INVITE.search(t): continue
         if b["t"] == "p" and len(t) < 25 and not seen_body: continue  # captions/kickers before the text starts
         if b["t"] == "p" and len(t) > 200:
             long_paras += 1; seen_body = long_paras >= 2
@@ -213,8 +246,9 @@ def best_blocks(html_str, url=None):
     cands.append(tidy(blocks_from_html_fallback(html_str)))
     cands = [c for c in cands if c]
     if not cands: return []
-    # trafilatura is cleaner, so prefer it unless it clearly missed the body
-    if len(cands) == 2 and words_in(cands[0]) >= max(150, 0.5 * words_in(cands[1])): return cands[0]
+    # trafilatura is purpose-built for this; the regex fallback sweeps up site
+    # furniture, so only fall back when trafilatura clearly missed the article.
+    if len(cands) == 2 and words_in(cands[0]) >= 150: return cands[0]
     return max(cands, key=words_in)
 
 def extract_article(url, feed_content, fetch_page=True):
@@ -299,8 +333,16 @@ def dedupe(blocks, title, summary):
     """Drop leading blocks that repeat the headline/standfirst, and any later
     paragraph that duplicates an earlier one (sites' pull-quotes)."""
     heads = {norm(title), norm(strip_html(summary))}
-    while blocks and (norm(blocks[0]["text"]) in heads or (blocks[0]["t"] == "h2" and norm(blocks[0]["text"]) == norm(title))):
-        blocks.pop(0)
+    # Publishers often open with the page headline, which can differ slightly
+    # from the feed's title ("drags on" vs "heads towards third day").
+    while blocks:
+        t = blocks[0]["text"]
+        if norm(t) in heads or (len(t) < 200 and not t.rstrip().endswith((".", "!", "?", "”", '"')) and similar(t, title) >= 0.6):
+            blocks.pop(0); continue
+        break
+    for b in blocks:
+        if b["t"] == "p" and len(b["text"]) < 24 and b["text"].rstrip().endswith(":"):
+            b["t"] = "h2"; b["text"] = b["text"].rstrip(": ")
     seen, out = set(), []
     for b in blocks:
         k = norm(b["text"])
@@ -309,7 +351,7 @@ def dedupe(blocks, title, summary):
     return out
 
 def dek_from(summary, blocks):
-    s = strip_html(summary)
+    s = WP_FEED_TAIL.sub("", strip_html(summary)).strip()
     if 40 <= len(s) <= 260: return s
     if len(s) > 260: return s[:250].rsplit(" ", 1)[0] + "…"
     for b in blocks:
@@ -360,41 +402,44 @@ def main():
                 continue  # picked up next run
             fetched += 1
             title = html.unescape(e["title"]).strip()
-            if is_video:
-                dur = video_details(e["yt_id"])
-                # hqdefault is 4:3 with black bars; hq720 is a true 16:9 frame
-                if e["image"] and "/hqdefault.jpg" in e["image"]:
-                    e["image"] = e["image"].replace("/hqdefault.jpg", "/hq720.jpg")
-                desc = e["summary"] or ""
-                detail = {"id": iid, "type": "video", "description": clean_description(desc), "chapters": parse_chapters(desc), "transcript": None}
-                item = {
-                    "id": iid, "type": "video", "sourceId": src["id"], "title": title,
-                    "dek": (clean_description(desc).split(". ")[0] or title)[:220], "author": None,
-                    "publishedAt": pub.isoformat(), "durationSec": dur,
-                    "topics": topics_for(src, title, desc), "image": e["image"], "url": e["url"], "youtubeId": e["yt_id"],
-                }
-                log(f"   + video {title[:60]} ({dur}s)")
-            else:
-                if src.get("metadataOnly"):
-                    blocks, ok, image = [], False, e["image"]
-                    if not image:
-                        try:
-                            pg, _ = fetch(e["url"]); image = og_image(pg.decode("utf-8", "ignore"))
-                        except Exception: pass
+            try:
+                if is_video:
+                    dur = video_details(e["yt_id"])
+                    # hqdefault is 4:3 with black bars; hq720 is a true 16:9 frame
+                    if e["image"] and "/hqdefault.jpg" in e["image"]:
+                        e["image"] = e["image"].replace("/hqdefault.jpg", "/hq720.jpg")
+                    desc = e["summary"] or ""
+                    detail = {"id": iid, "type": "video", "description": clean_description(desc), "chapters": parse_chapters(desc), "transcript": None}
+                    item = {
+                        "id": iid, "type": "video", "sourceId": src["id"], "title": title,
+                        "dek": (clean_description(desc).split(". ")[0] or title)[:220], "author": None,
+                        "publishedAt": pub.isoformat(), "durationSec": dur,
+                        "topics": topics_for(src, title, desc), "image": e["image"], "url": e["url"], "youtubeId": e["yt_id"],
+                    }
+                    log(f"   + video {title[:60]} ({dur}s)")
                 else:
-                    blocks, image, ok = extract_article(e["url"], e["content"] or e["summary"])
-                    blocks = dedupe(blocks, title, e["summary"]); ok = words_in(blocks) >= 120
-                words = sum(len(b["text"].split()) for b in blocks)
-                item = {
-                    "id": iid, "type": "article", "sourceId": src["id"], "title": title,
-                    "dek": dek_from(e["summary"], blocks), "author": strip_html(e["author"])[:80] or None,
-                    "publishedAt": pub.isoformat(), "readMinutes": max(1, round(words / 230)) if ok else 0,
-                    "topics": topics_for(src, title, e["summary"]), "image": image or e["image"], "url": e["url"],
-                    "hasBody": ok,
-                }
-                detail = {"id": iid, "type": "article", "body": blocks if ok else []}
-                log(f"   + {title[:60]} ({words} words)" if ok else f"   ~ {title[:60]} (metadata only)")
-                time.sleep(0.4)  # be gentle with publishers
+                    if src.get("metadataOnly"):
+                        blocks, ok, image = [], False, e["image"]
+                        if not image:
+                            try:
+                                pg, _ = fetch(e["url"]); image = og_image(pg.decode("utf-8", "ignore"))
+                            except Exception: pass
+                    else:
+                        blocks, image, ok = extract_article(e["url"], e["content"] or e["summary"])
+                        blocks = dedupe(blocks, title, e["summary"]); ok = words_in(blocks) >= 120
+                    words = sum(len(b["text"].split()) for b in blocks)
+                    item = {
+                        "id": iid, "type": "article", "sourceId": src["id"], "title": title,
+                        "dek": dek_from(e["summary"], blocks), "author": strip_html(e["author"])[:80] or None,
+                        "publishedAt": pub.isoformat(), "readMinutes": max(1, round(words / 230)) if ok else 0,
+                        "topics": topics_for(src, title, e["summary"]), "image": image or e["image"], "url": e["url"],
+                        "hasBody": ok,
+                    }
+                    detail = {"id": iid, "type": "article", "body": blocks if ok else []}
+                    log(f"   + {title[:60]} ({words} words)" if ok else f"   ~ {title[:60]} (metadata only)")
+                    time.sleep(0.4)  # be gentle with publishers
+            except Exception as ex:      # a single flaky page must not end the run
+                log("   ! skipped:", title[:60], ex); continue
             item["worth"] = worth_for(src, item)
             with open(item_file, "w") as f: json.dump(detail, f, ensure_ascii=False)
             items.append(item); count += 1
