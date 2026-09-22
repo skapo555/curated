@@ -603,11 +603,25 @@ function applyPrefs() {
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyPrefs);
 applyPrefs();
 $('#main').innerHTML = '<div class="boot"><span class="wordmark">curated</span></div>';
-Promise.race([loadContent(), new Promise(r => setTimeout(() => r(false), 6000))]).then((live) => {
-  S.syncSources(!!live);
+function offlineScreen(retrying) {
+  renderNav('today');
+  $('#main').innerHTML = `<header class="page-head"><div class="head-row"><span class="wordmark">curated</span></div></header>
+    <div class="empty" style="padding-top:60px">Couldn’t reach your content.
+      <small>Curated only ever shows pieces from the sources you follow — so rather than invent something, it waits. Check your connection and try again.</small>
+      <button class="btn primary" id="retry" style="margin-top:22px" ${retrying ? 'disabled' : ''}>${retrying ? 'Trying…' : 'Try again'}</button>
+    </div>`;
+  const b = $('#retry'); if (b) b.onclick = () => { offlineScreen(true); boot(); };
+}
+
+async function boot() {
+  const live = await Promise.race([loadContent(), new Promise(r => setTimeout(() => r(false), 12000))]);
+  if (!live) { offlineScreen(false); return; }
+  S.syncSources(true);
+  window.removeEventListener('hashchange', render);
   window.addEventListener('hashchange', render);
   render();
-});
+}
+boot();
 
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
   window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));

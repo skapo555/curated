@@ -13,14 +13,14 @@ const DEFAULTS = () => ({
   saved: {},      // itemId -> timestamp
   feedback: {},   // itemId -> 'up' | 'down'
   notes: {},      // itemId -> text
-  followed: Object.fromEntries(SOURCES.map(s => [s.id, s.followed])),
+  followed: {},   // sourceId -> bool, filled in by syncSources() once content loads
   settings: {
     archiveDays: 7,
     completion: 'auto',   // auto | ask | manual
     theme: 'system',      // system | light | dark
     textSize: 'm',        // s | m | l
   },
-  seeded: false,
+  liveSynced: false,
 });
 
 let state = load();
@@ -31,25 +31,10 @@ function load() {
     if (raw) {
       const parsed = JSON.parse(raw);
       const merged = { ...DEFAULTS(), ...parsed, settings: { ...DEFAULTS().settings, ...(parsed.settings || {}) } };
-      // Newly added sources get their default follow state.
-      for (const s of SOURCES) if (!(s.id in merged.followed)) merged.followed[s.id] = s.followed;
       return merged;
     }
   } catch (e) { /* fall through to fresh state */ }
-  return seed(DEFAULTS());
-}
-
-/* First-run seed so the very first open already shows something in
-   progress — the loop the prototype exists to demonstrate. */
-function seed(s) {
-  s.progress['fa-long-peace'] = 0.42;
-  s.opened['fa-long-peace'] = Date.now() - 20 * 3600 * 1000;
-  s.progress['perun-aukus'] = 0.31;
-  s.opened['perun-aukus'] = Date.now() - 2 * 24 * 3600 * 1000;
-  s.saved['guardian-river'] = Date.now() - 3 * 24 * 3600 * 1000;
-  s.saved['noah-industrial'] = Date.now() - 1 * 24 * 3600 * 1000;
-  s.seeded = true;
-  return s;
+  return DEFAULTS();
 }
 
 function save() {
@@ -76,7 +61,10 @@ export function syncSources(live = false) {
 }
 
 export function resetAll() {
-  state = seed(DEFAULTS());
+  const followed = state.followed;
+  state = DEFAULTS();
+  state.followed = Object.fromEntries(SOURCES.map(s => [s.id, !s.unavailable]));
+  state.liveSynced = true;
   save();
 }
 
