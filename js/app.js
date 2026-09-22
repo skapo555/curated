@@ -153,7 +153,8 @@ function groupedByDay(items, opts) {
 }
 const brandMark = () => `<a class="mark" href="#/" aria-label="Curated — Today">c</a>`;
 function pageHead(title, sub = '', back = null) {
-  return `<header class="page-head"><div class="head-row">${back ? `<a class="icon-btn" href="${back}" aria-label="Back">${I.back}</a>` : ''}<a class="wordmark" href="#/" aria-label="Curated — Today">curated</a></div><h1 class="page-title">${esc(title)}</h1>${sub ? `<p class="page-sub">${sub}</p>` : ''}</header>`;
+  const gear = title === 'Settings' ? '' : `<span class="spacer"></span><a class="icon-btn" href="#/settings" aria-label="Settings">${I.settings}</a>`;
+  return `<header class="page-head"><div class="head-row">${back ? `<a class="icon-btn" href="${back}" aria-label="Back">${I.back}</a>` : ''}<a class="wordmark" href="#/" aria-label="Curated — Today">curated</a>${gear}</div><h1 class="page-title">${esc(title)}</h1>${sub ? `<p class="page-sub">${sub}</p>` : ''}</header>`;
 }
 
 /* ============================================================ screens */

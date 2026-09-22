@@ -513,7 +513,7 @@ select.native { position: absolute; inset: 0; opacity: 0; width: 100%; height: 1
 
   /* Home: full-width continue band, then three across */
   .page-head { position: relative; }
-  .head-row .icon-btn[href="#/settings"] { position: absolute; right: -8px; top: 34px; }
+  .head-row .icon-btn[href="#/settings"] { display: none; }
   .home-grid { display: block; }
   .picks { display: grid; grid-template-columns: repeat(3, 1fr); gap: 36px; }
   .pick { padding: 0; border-bottom: 0; }
