@@ -1,4 +1,7 @@
--- Curated — account and sync schema.
+-- Curated — account and sync schema.   [VERSION 2 — 23 Sep 2026]
+--
+-- If the first line of what you pasted does not say VERSION 2, you have an
+-- older copy: re-copy the file before running it.
 --
 -- Run once in the Supabase SQL editor. Every table is protected by row-level
 -- security: a signed-in user can only ever see and change their own rows, and
