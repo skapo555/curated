@@ -219,6 +219,36 @@ def sitemap_entries(src, known, budget, seen):
                "image": m["image"], "yt_id": "", "page": page}
     if skipped: log(f"   skipped {skipped} known to be outside the window")
 
+# ---------------------------------------------------------------- images
+# A publisher's og:image is sized for a social card, not for a phone screen at
+# 3x. Where the same CDN will serve a larger render of the same picture for a
+# similar number of bytes, ask for that instead. Measured, not guessed: each
+# rule below was checked for both the pixels it returns and the weight it adds.
+IMAGE_RULES = [
+    # ABC's social policy caps around 860px (and 100px for some assets). The
+    # crop params are ignored; only width and height decide the render.
+    (re.compile(r"^https://[^/]*abc-cdn\.net\.au/[^?]+"),
+     lambda m, u: m.group(0) + "?impolicy=wcms_crop_resize&cropH=9999&cropW=9999"
+                               "&xPos=0&yPos=0&width=1400&height=787"),
+    # The Diplomat ships a 600px "small" card; xl is 1892px for 125KB. The
+    # bare original is 1.8MB, so don't reach for that.
+    (re.compile(r"(^https://thediplomat\.com/.*/sizes/)td-story-s-2(/)"),
+     lambda m, u: u.replace(m.group(0), m.group(1) + "td-story-xl-2" + m.group(2))),
+    # The Monthly's Drupal "large" style is 480px; the 2x front-page style is 1600px.
+    (re.compile(r"(^https://[^/]*themonthly\.com\.au/.*/styles/)large(/)"),
+     lambda m, u: u.replace(m.group(0), m.group(1) + "frontpage_large_2x" + m.group(2))),
+]
+
+def upgrade_image(url):
+    """Swap a social-card thumbnail for the same picture at screen resolution."""
+    if not url: return url
+    for pat, build in IMAGE_RULES:
+        m = pat.search(url)
+        if m:
+            try: return build(m, url)
+            except Exception: return url
+    return url
+
 # ---------------------------------------------------------------- articles
 def blocks_from_xml(xml_str):
     """trafilatura's XML output -> [{t:'p'|'h2'|'quote', text}]"""
@@ -542,7 +572,7 @@ def main():
                         "id": iid, "type": "video", "sourceId": src["id"], "title": title,
                         "dek": (clean_description(desc).split(". ")[0] or title)[:220], "author": None,
                         "publishedAt": pub.isoformat(), "durationSec": dur,
-                        "topics": topics_for(title, desc), "image": e["image"], "url": e["url"], "youtubeId": e["yt_id"],
+                        "topics": topics_for(title, desc), "image": upgrade_image(e["image"]), "url": e["url"], "youtubeId": e["yt_id"],
                     }
                     log(f"   + video {title[:60]} ({dur}s)")
                 else:
