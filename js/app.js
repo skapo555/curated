@@ -180,8 +180,6 @@ function knowRow(item) {
   </a>`;
 }
 
-/* Home shows the first few; the rest live in their own section. */
-function briefRow(item) { return knowRow(item); }
 
 function listRow(item, opts = {}) {
   const p = S.progressOf(item.id); const done = S.isCompleted(item.id);
@@ -213,8 +211,6 @@ screens.home = () => {
   S.recordSurfaced(picks.map(p => p.item.id));
   const newCount = S.allNew().length;
   const todayCount = picks.filter(p => p.hours <= 24).length;
-  const brief = S.inTheKnow(4, picks.map(p => p.item.id));
-  const briefTotal = S.inTheKnow(Infinity).length;
   const cont = reading.length ? `<section class="section" aria-labelledby="cr">
       <div class="section-head"><h2 class="kicker" id="cr">Continue ${reading[0].type === 'video' ? 'Watching' : 'Reading'}</h2>${reading.length > 1 ? '<a class="section-link" href="#/reading">All →</a>' : ''}</div>
       ${continueCard(reading[0])}
@@ -227,10 +223,6 @@ screens.home = () => {
     </section>` : `<section class="section"><div class="empty">Nothing new is waiting for you.<small>That's fine. ${reading.length ? 'Finish what you started, or ' : 'F'}ollow a source or two when you feel like it.</small></div></section>`;
   return `<header class="page-head"><div class="head-row"><a class="wordmark" href="#/" aria-label="Curated — Today">curated</a><span class="spacer"></span><a class="icon-btn" href="#/settings" aria-label="Settings">${I.settings}</a></div><div class="dateline">${todayLine()}</div></header>
     <div class="home-grid"><div>${cont}</div><div>${three}
-    ${brief.length ? `<section class="section" aria-labelledby="itk">
-      <div class="section-head"><h2 class="kicker" id="itk">In the Know</h2><a class="section-link" href="#/know">All ${briefTotal} →</a></div>
-      <div class="know">${brief.map(knowRow).join('')}</div>
-    </section>` : ''}
     ${newCount > 0 ? `<div class="see-all"><a href="#/new">See all ${newCount} new →</a></div>` : ''}</div></div>`;
 };
 

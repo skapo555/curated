@@ -102,9 +102,9 @@
     "id": "frontline",
     "name": "Frontline",
     "type": "publication",
-    "tagline": "The Hindu's magazine — long-form reporting and analysis from India.",
-    "feed": "https://frontline.thehindu.com/feeder/default.rss",
-    "home": "https://frontline.thehindu.com"
+    "tagline": "The Hindu's magazine on world affairs — India's view of the wider world.",
+    "feed": "https://frontline.thehindu.com/world-affairs/feeder/default.rss",
+    "home": "https://frontline.thehindu.com/world-affairs/"
   },
   {
     "id": "newmandala",
@@ -129,5 +129,13 @@
     "tagline": "International news with an Australian lens.",
     "feed": "https://www.sbs.com.au/news/topic/world/feed",
     "home": "https://www.sbs.com.au/news/topic/world"
+  },
+  {
+    "id": "gatewayhouse",
+    "name": "Gateway House",
+    "type": "research",
+    "tagline": "Indian Council on Global Relations — India's foreign policy and economic diplomacy.",
+    "feed": "https://www.gatewayhouse.in/feed/",
+    "home": "https://www.gatewayhouse.in"
   }
 ]
