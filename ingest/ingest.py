@@ -45,7 +45,9 @@ NS = {
 
 TOPIC_RULES = {
     "defence": r"\b(defen[cs]e|military|navy|naval|army|air force|adf|aukus|submarine|missile|weapon|war\b|warfare|nato|deterren|nuclear|security|drone)",
-    "geopolitics": r"\b(china|beijing|taiwan|indo-pacific|pacific|asean|indonesia|japan|india|korea|russia|ukraine|diplomac|alliance|sanction|geopolit|foreign polic|us-|washington|trump|xi jinping|southeast asia|middle east|iran|israel)",
+    "geopolitics": r"\b(indo-pacific|pacific|asean|indonesia|japan|korea|russia|ukraine|diplomac|alliance|sanction|geopolit|foreign polic|us-|washington|trump|southeast asia|middle east|iran|israel|united nations|multilateral)",
+    "china": r"\b(china|chinese|beijing|shanghai|xi jinping|\bccp\b|\bprc\b|taiwan|taipei|hong kong|belt and road|\bpla\b|xinjiang|south china sea|yuan|renminbi)",
+    "india": r"\b(india|indian|new delhi|modi|\bbjp\b|mumbai|bengaluru|rupee|quad\b|kashmir|pakistan|south asia)",
     "economics": r"\b(econom|inflation|interest rate|rba\b|reserve bank|budget|gdp|trade|tariff|market|investment|productivity|tax|housing|wages?|employment|superannuation|dollar)",
     "australia": r"\b(australia|canberra|sydney|melbourne|brisbane|perth|adelaide|nsw|queensland|victoria|labor|coalition|albanese|dutton|aussie|australian)",
     "technology": r"\b(technolog|\bai\b|artificial intelligence|semiconductor|chip|cyber|software|platform|data|digital|internet|algorithm|quantum)",

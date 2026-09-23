@@ -7,6 +7,8 @@ export const TOPICS = [
   { id: 'australia',   name: 'Australia',     blurb: 'Politics, policy and life at home.' },
   { id: 'economics',   name: 'Economics',     blurb: 'Markets, money and the real economy.' },
   { id: 'geopolitics', name: 'Geopolitics',   blurb: 'Power, alliances and the Indo-Pacific.' },
+  { id: 'china',       name: 'China',         blurb: 'The largest single subject here — Beijing, Taiwan, and the reach of both.' },
+  { id: 'india',       name: 'India',         blurb: 'India as a power: its neighbourhood and the wider order.' },
   { id: 'defence',     name: 'Defence',       blurb: 'Strategy, capability and security.' },
   { id: 'technology',  name: 'Technology',    blurb: 'Platforms, chips and what they change.' },
   { id: 'science',     name: 'Science',       blurb: 'Energy, climate and discovery.' },

@@ -49,9 +49,14 @@
     "name": "Inside Story",
     "type": "publication",
     "region": "australia",
-    "tagline": "Current affairs and culture from Australia, at length.",
+    "tagline": "Australian politics, policy and reportage, at length.",
     "feed": "https://insidestory.org.au/feed/",
-    "home": "https://insidestory.org.au"
+    "home": "https://insidestory.org.au",
+    "excludeCategories": [
+      "Books & arts",
+      "Cinema",
+      "Music"
+    ]
   },
   {
     "id": "abc",
@@ -107,16 +112,6 @@
     "tagline": "Long-form defence economics, one PowerPoint at a time.",
     "feed": "https://www.youtube.com/feeds/videos.xml?channel_id=UCC3ehuUksTyQ7bbjGntmx3Q",
     "home": "https://www.youtube.com/@PerunAU"
-  },
-  {
-    "id": "foreignaffairs",
-    "name": "Foreign Affairs",
-    "type": "publication",
-    "region": "global",
-    "tagline": "Essays on international relations and grand strategy. Paywalled — headlines here, read on the site.",
-    "feed": "https://www.foreignaffairs.com/rss.xml",
-    "home": "https://www.foreignaffairs.com",
-    "metadataOnly": true
   },
   {
     "id": "monthly",
