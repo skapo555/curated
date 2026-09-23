@@ -81,8 +81,6 @@ grant select, insert, update, delete on
   public.profiles, public.follows, public.item_state, public.notes
   to authenticated;
 
-revoke all on public.allowed_emails from anon, authenticated;  -- server-side only
-
 -- ---------------------------------------------------------------- housekeeping
 -- Keep updated_at honest; the sync merge relies on it.
 create or replace function public.touch_updated_at()
@@ -123,7 +121,10 @@ create table if not exists public.allowed_emails (
   added_at   timestamptz not null default now()
 );
 
-alter table public.allowed_emails enable row level security;  -- no policies: server-side only
+-- No policies and no grants: the allowlist is server-side only, reachable by
+-- the trigger below (which runs as definer) but not by the app.
+alter table public.allowed_emails enable row level security;
+revoke all on public.allowed_emails from anon, authenticated;
 
 create or replace function public.enforce_allowlist()
 returns trigger language plpgsql security definer set search_path = '' as $$
