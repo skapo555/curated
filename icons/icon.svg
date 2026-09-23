@@ -1,5 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
   <rect width="512" height="512" rx="112" fill="#f6f4ef"/>
-  <text x="238" y="356" text-anchor="middle" font-family="Fraunces, 'Cooper Black', 'Clarendon', Georgia, serif" font-size="330" font-weight="900" fill="#1c1b19">c</text>
-  <circle cx="392" cy="330" r="22" fill="#8a3b2c"/>
+  <!-- Placement is measured, not eyeballed: the ink of the "c" sits 73.9 above
+       its baseline at this size, so a baseline of 330 puts the "c." unit's ink
+       centre on 256 in both axes. -->
+  <text x="221" y="330" text-anchor="middle" font-family="Fraunces, 'Cooper Black', Clarendon, Georgia, serif" font-size="330" font-weight="900" fill="#1c1b19">c</text>
+  <circle cx="341" cy="308" r="22" fill="#8a3b2c"/>
 </svg>

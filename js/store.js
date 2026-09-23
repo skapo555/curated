@@ -23,6 +23,8 @@ const DEFAULTS = () => ({
     completion: 'auto',   // auto | ask | manual
     theme: 'system',      // system | light | dark
     textSize: 'm',        // s | m | l
+    readingFont: 'serif', // serif | sans
+    pickCount: 10,        // how many Home surfaces at once
   },
   liveSynced: false,
   at: { items: {}, followed: {}, notes: {}, settings: {} },
@@ -150,6 +152,13 @@ export function finished() {
     .sort((a, b) => state.completed[b.id] - state.completed[a.id]);
 }
 
+/* Every note the user has written, newest first, with its piece attached. */
+export function allNotes() {
+  return Object.entries(state.notes)
+    .map(([id, body]) => ({ id, body, at: state.at.notes[id] || 0, item: itemById(id) }))
+    .sort((a, b) => b.at - a.at);
+}
+
 export function savedItems() {
   return ITEMS.filter(i => isSaved(i.id))
     .sort((a, b) => state.saved[b.id] - state.saved[a.id]);
@@ -197,7 +206,7 @@ function jitter(id) {
   return (n % 1000) / 1000 * 0.6;
 }
 
-export function threeWorthYourTime() {
+export function worthYourTime(n = state.settings.pickCount || 3) {
   const aff = affinities();
   const pool = allNew().filter(i => !isStarted(i.id) && !isSaved(i.id) && feedbackOf(i.id) !== 'down');
   const scored = pool.map(item => {
@@ -212,21 +221,26 @@ export function threeWorthYourTime() {
 
   const picks = [];
   const usedSources = new Set(); const usedTopics = new Set(); let videos = 0;
+  const maxVideos = Math.max(1, Math.round(n / 5));
+  const maxPerSource = n <= 3 ? 1 : Math.max(1, Math.ceil(n / 6));
+  const bySource = {};
   const tryPick = (strict) => {
     for (const c of scored) {
-      if (picks.length === 3) break;
+      if (picks.length === n) break;
       if (picks.includes(c)) continue;
-      if (usedSources.has(c.item.sourceId)) continue;
-      if (c.item.type === 'video' && videos >= 1) continue;
+      if ((bySource[c.item.sourceId] || 0) >= maxPerSource) continue;
+      if (c.item.type === 'video' && videos >= maxVideos) continue;
       if (strict && c.item.topics.every(t => usedTopics.has(t))) continue;
-      picks.push(c); usedSources.add(c.item.sourceId);
+      picks.push(c);
+      bySource[c.item.sourceId] = (bySource[c.item.sourceId] || 0) + 1;
+      usedSources.add(c.item.sourceId);
       c.item.topics.forEach(t => usedTopics.add(t));
       if (c.item.type === 'video') videos++;
     }
   };
   tryPick(true); tryPick(false);
   // Absolute last resort: fill with anything left (e.g. tiny source universe).
-  for (const c of scored) { if (picks.length === 3) break; if (!picks.includes(c)) picks.push(c); }
+  for (const c of scored) { if (picks.length === n) break; if (!picks.includes(c)) picks.push(c); }
 
   return picks.map(c => ({ ...c, reason: reasonFor(c, aff) }));
 }

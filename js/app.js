@@ -56,6 +56,10 @@ const I = {
   pause: '<svg viewBox="0 0 24 24"><path d="M6 4.5h4v15H6zM14 4.5h4v15h-4z"/></svg>',
   search: '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4 4"/></svg>',
   ext: '<svg viewBox="0 0 24 24"><path d="M14 5h5v5M19 5l-8 8"/><path d="M17 13v6H5V7h6"/></svg>',
+  type: '<svg viewBox="0 0 24 24"><path d="M4 18L8.5 6l4.5 12M5.6 14h5.8"/><path d="M15 18l2.6-7 2.6 7M15.9 15.6h3.4"/></svg>',
+  notebook: '<svg viewBox="0 0 24 24"><path d="M7 4.5h11v15H7z"/><path d="M7 4.5a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2"/><path d="M10 9h5M10 12.5h5"/></svg>',
+  browse: '<svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>',
+  refresh: '<svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v5h-5"/></svg>',
   chevDown: '<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>',
   chevUp: '<svg viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/></svg>',
 };
@@ -95,19 +99,32 @@ function imgHTML(item, ratio = 'r-3x2', w = 900, h = 600, extra = '') {
   // The monogram sits underneath: it shows when a publisher has no image, or
   // blocks hotlinking (ABC's CDN does), instead of an empty coloured block.
   const ph = `<span class="ph" aria-hidden="true"><b>${esc(name.slice(0, 1))}</b><i>${esc(name)}</i></span>`;
-  const img = url ? `<img src="${esc(url)}" alt="" loading="lazy" decoding="async" onload="this.classList.add('loaded')" onerror="this.remove()">` : '';
+  const img = url ? `<img src="${esc(url)}" alt="" loading="lazy" decoding="async" onload="this.classList.add('loaded')">` : '';
   return `<div class="img ${ratio}" style="--tone:${tone}">${ph}${img}${extra}</div>`;
 }
 const videoExtras = (item, play = false) => `<span class="dur">${fmtDur(item.durationSec)}</span>${play ? `<span class="play"><span>${I.play}</span></span>` : ''}`;
 
+/* A publisher's image can fail for a moment on a patchy connection. Give it one
+   more try before falling back to the monogram underneath. */
+document.addEventListener('error', (e) => {
+  const img = e.target;
+  if (!(img instanceof HTMLImageElement) || !img.closest('.img')) return;
+  if (img.dataset.retried) { img.remove(); return; }
+  img.dataset.retried = '1';
+  const src = img.src.split('#')[0];
+  setTimeout(() => { img.src = src + (src.includes('?') ? '&' : '?') + 'r=1'; }, 1200);
+}, true);
+
 /* ============================================================ nav */
 const NAV_MAIN = [
   { id: 'today', href: '#/', label: 'Today', icon: I.today },
+  { id: 'new', href: '#/new', label: 'All New', icon: I.browse },
   { id: 'topics', href: '#/topics', label: 'Topics', icon: I.topics },
   { id: 'saved', href: '#/saved', label: 'Saved', icon: I.saved },
   { id: 'sources', href: '#/sources', label: 'Sources', icon: I.sources },
 ];
 const NAV_MORE = [
+  { id: 'notes', href: '#/notes', label: 'Notebook', icon: I.notebook },
   { id: 'reading', href: '#/reading', label: 'Currently Reading', icon: I.reading },
   { id: 'archive', href: '#/archive', label: 'Archive', icon: I.archive },
   { id: 'settings', href: '#/settings', label: 'Settings', icon: I.settings },
@@ -136,13 +153,14 @@ function miniRow(item) {
 }
 function pickCard({ item, reason }, n) {
   const isVideo = item.type === 'video';
-  const meta = `<div class="meta"><span class="src">${esc(src(item).name)}</span><span>${lengthLabel(item)}</span></div>`;
+  const meta = `<div class="meta"><span class="src">${esc(srcName(item))}</span><span>${lengthLabel(item)}</span></div>`;
   if (n === 1) {
     return `<a class="pick pick-lead" href="#/item/${item.id}">${imgHTML(item, 'r-16x9', 1000, 563, isVideo ? videoExtras(item, true) : '')}
-      <span class="n">${n}.</span>${meta}<h3>${esc(item.title)}</h3><p class="dek">${esc(item.dek)}</p><span class="reason">${esc(reason)}</span></a>`;
+      <div class="pick-text"><span class="n">${n}.</span>${meta}<h3>${esc(item.title)}</h3><p class="dek">${esc(item.dek)}</p><span class="reason">${esc(reason)}</span></div></a>`;
   }
   return `<a class="pick pick-split" href="#/item/${item.id}"><div><span class="n">${n}.</span>${meta}<h3>${esc(item.title)}</h3><p class="dek">${esc(item.dek)}</p><span class="reason">${esc(reason)}</span></div>${imgHTML(item, 'r-1x1', 400, 400, isVideo ? `<span class="dur">${fmtDur(item.durationSec)}</span>` : '')}</a>`;
 }
+
 function listRow(item, opts = {}) {
   const p = S.progressOf(item.id); const done = S.isCompleted(item.id);
   const state = done ? `<span class="state">${I.check.replace('<svg', '<svg style="width:14px;height:14px;stroke:var(--success);fill:none;stroke-width:2.4"')} Finished</span>`
@@ -169,21 +187,21 @@ const screens = {};
 screens.home = () => {
   renderNav('today');
   const reading = S.currentlyReading();
-  const picks = S.threeWorthYourTime();
+  const picks = S.worthYourTime();
   const newCount = S.allNew().length;
   const cont = reading.length ? `<section class="section" aria-labelledby="cr">
       <div class="section-head"><h2 class="kicker" id="cr">Continue ${reading[0].type === 'video' ? 'Watching' : 'Reading'}</h2>${reading.length > 1 ? '<a class="section-link" href="#/reading">All →</a>' : ''}</div>
       ${continueCard(reading[0])}
       ${reading.length > 1 ? `<div class="continue-more">${reading.slice(1, 3).map(miniRow).join('')}</div>` : ''}
     </section>` : '';
+  const heading = picks.length >= 3 ? `${picks.length} Worth Your Time` : picks.length === 2 ? 'Two Worth Your Time' : 'One Worth Your Time';
   const three = picks.length ? `<section class="section" aria-labelledby="tw">
-      <div class="section-head"><h2 class="kicker" id="tw">${picks.length === 3 ? 'Three' : picks.length === 2 ? 'Two' : 'One'} Worth Your Time</h2></div>
+      <div class="section-head"><h2 class="kicker" id="tw">${heading}</h2><a class="section-link" href="#/settings">Show fewer →</a></div>
       <div class="picks">${picks.map((p, i) => pickCard(p, i + 1)).join('')}</div>
     </section>` : `<section class="section"><div class="empty">Nothing new is waiting for you.<small>That's fine. ${reading.length ? 'Finish what you started, or ' : 'F'}ollow a source or two when you feel like it.</small></div></section>`;
   return `<header class="page-head"><div class="head-row"><a class="wordmark" href="#/" aria-label="Curated — Today">curated</a><span class="spacer"></span><a class="icon-btn" href="#/settings" aria-label="Settings">${I.settings}</a></div><div class="dateline">${todayLine()}</div></header>
     <div class="home-grid"><div>${cont}</div><div>${three}
-    ${newCount > 0 ? `<div class="see-all"><a href="#/new">See all new content →</a></div>` : ''}</div></div>
-    ${!reading.length && picks.length ? '<p class="calm">Pick one. The rest will still be there.</p>' : ''}`;
+    ${newCount > 0 ? `<div class="see-all"><a href="#/new">See all ${newCount} new →</a></div>` : ''}</div></div>`;
 };
 
 let newFilter = { kind: 'all', source: '', topic: '' };
@@ -232,6 +250,53 @@ screens.saved = () => {
   const items = S.savedItems();
   return pageHead('Saved', 'Set aside for when you have the time.') +
     `<div class="list grid">${items.length ? items.map(i => listRow(i)).join('') : '<div class="empty">Nothing saved yet.<small>Tap the bookmark on anything to keep it here.</small></div>'}</div>`;
+};
+
+screens.notes = () => {
+  renderNav('');
+  const notes = S.allNotes();
+  const row = (n) => {
+    const it = n.item;
+    const when = n.at ? relTime(new Date(n.at).toISOString()) : '';
+    return `<article class="note-card">
+      <div class="note-body">${esc(n.body)}</div>
+      <div class="note-foot">
+        ${it ? `<a class="note-src" href="#/item/${it.id}">${esc(srcName(it))} · ${esc(it.title)}</a>`
+             : `<span class="note-src gone">The piece this belongs to has left your feed</span>`}
+        <span class="note-when">${when}</span>
+      </div>
+    </article>`;
+  };
+  return pageHead('Notebook', 'Everything you\u2019ve written, in one place. Private to this device.', '#/') +
+    (notes.length ? `<div class="notebook-actions"><button class="btn ghost sm" id="nb-copy">Copy all</button><button class="btn ghost sm" id="nb-download">Download (.md)</button></div>` : '') +
+    `<div class="notebook">${notes.length ? notes.map(row).join('') : '<div class="empty">No notes yet.<small>Open anything and tap the notes button while you read.</small></div>'}</div>`;
+};
+screens.notes.mount = (root) => {
+  const md = () => {
+    const lines = ['# Curated \u2014 notebook', '', `Exported ${new Date().toLocaleString('en-AU')}`, ''];
+    for (const n of S.allNotes()) {
+      const it = n.item;
+      lines.push(it ? `## ${it.title}` : '## (piece no longer in your feed)');
+      if (it) lines.push(`*${srcName(it)}${it.author ? ' \u2014 ' + it.author : ''}* \u00b7 [${it.url}](${it.url})`);
+      lines.push('', n.body, '');
+    }
+    return lines.join('\n');
+  };
+  const copy = $('#nb-copy', root);
+  if (copy) copy.onclick = async () => {
+    try { await navigator.clipboard.writeText(md()); toast('Notebook copied', true); }
+    catch (e) { toast('Couldn\u2019t copy \u2014 try Download'); }
+  };
+  const dl = $('#nb-download', root);
+  if (dl) dl.onclick = () => {
+    const blob = new Blob([md()], { type: 'text/markdown' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `curated-notebook-${new Date().toISOString().slice(0, 10)}.md`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    toast('Notebook downloaded', true);
+  };
 };
 
 screens.reading = () => {
@@ -284,16 +349,18 @@ screens.settings = () => {
   return pageHead('Settings', '', '#/') +
     `<div class="group"><h2>Archive after</h2><p class="desc">New content leaves the active feed after this long. It isn’t deleted — it moves to Archive.</p><div class="options" role="radiogroup">${[3, 7, 14, 30].map(d => opt('archiveDays', d, `${d} days`, d === 7 ? 'Default' : '')).join('')}</div></div>
     <div class="group"><h2>When you reach the end</h2><p class="desc">What Curated does when you finish a piece.</p><div class="options" role="radiogroup">${opt('completion', 'auto', 'Mark as finished automatically', 'It leaves Currently Reading on its own')}${opt('completion', 'ask', 'Ask me', 'A quick “finished?” at the end')}${opt('completion', 'manual', 'I’ll mark it myself', 'Nothing happens until you say so')}</div></div>
+    <div class="group"><h2>How many on Today</h2><p class="desc">Curated picks these from your sources. Fewer means less to weigh up; more means more to browse.</p><div class="options" role="radiogroup">${opt('pickCount', 3, 'Three', 'Decide less')}${opt('pickCount', 5, 'Five')}${opt('pickCount', 10, 'Ten', 'Default')}${opt('pickCount', 15, 'Fifteen')}</div></div>
+    <div class="group"><h2>Reading type</h2><div class="options" role="radiogroup">${opt('readingFont', 'serif', 'Serif', 'Newsreader \u2014 made for long reading')}${opt('readingFont', 'sans', 'Sans', 'Inter \u2014 plainer, a little more compact')}</div></div>
     <div class="group"><h2>Reading text size</h2><div class="options" role="radiogroup">${opt('textSize', 's', 'Smaller')}${opt('textSize', 'm', 'Default')}${opt('textSize', 'l', 'Larger')}</div></div>
     <div class="group"><h2>Appearance</h2><div class="options" role="radiogroup">${opt('theme', 'system', 'Match system')}${opt('theme', 'light', 'Light')}${opt('theme', 'dark', 'Dark')}</div></div>
-    <div class="group"><h2>Library</h2><div class="options"><a class="opt link" href="#/reading"><span>Currently Reading</span><span class="chev"></span></a><a class="opt link" href="#/archive"><span>Archive</span><span class="chev"></span></a></div></div>
+    <div class="group"><h2>Library</h2><div class="options"><a class="opt link" href="#/notes"><span>Notebook</span><span class="chev"></span></a><a class="opt link" href="#/reading"><span>Currently Reading</span><span class="chev"></span></a><a class="opt link" href="#/archive"><span>Archive</span><span class="chev"></span></a></div></div>
     ${CONTENT.live ? `<div class="group"><h2>Content</h2><div class="options"><div class="opt"><span>Last refreshed<small>${relTime(CONTENT.generatedAt)} · ${SOURCES.filter(x => !x.unavailable).length} sources · keeps ${CONTENT.windowDays} days</small></span></div></div></div>` : ''}
     <div class="group"><h2>Prototype</h2><div class="options"><button class="opt danger" id="reset">Reset all reading data</button></div><p class="desc" style="margin-top:8px">Clears progress, saves, notes and reactions on this device. Notes never leave your browser.</p></div>
     <div class="about"><strong>Decide less. Read more.</strong>Curated shows you three things worth your time from the sources you chose — and nothing you didn’t ask for.</div>`;
 };
 screens.settings.mount = (root) => {
   $$('[data-set]', root).forEach(b => b.onclick = () => {
-    const k = b.dataset.set; let v = b.dataset.val; if (k === 'archiveDays') v = Number(v);
+    const k = b.dataset.set; let v = b.dataset.val; if (k === 'archiveDays' || k === 'pickCount') v = Number(v);
     S.setSetting(k, v); applyPrefs(); haptic(); render();
   });
   $('#reset', root).onclick = () => sheet(`<h2>Start fresh?</h2><p>This clears everything you’ve read, saved, reacted to and written on this device.</p><div class="row-btns"><button class="btn ghost" id="s-no">Keep it</button><button class="btn accent" id="s-yes">Reset</button></div>`,
@@ -340,6 +407,7 @@ function actionBarHTML(item) {
     <button id="a-up" aria-pressed="${fb === 'up'}" aria-label="More like this">${I.up}</button>
     <span class="sep"></span>
     <button id="a-note" aria-label="Notes">${I.note}${S.noteOf(item.id) ? '<span class="has-note"></span>' : ''}</button>
+    <button id="a-type" aria-label="Text size and type">${I.type}</button>
     <button id="a-share" aria-label="Share">${I.share}</button>
   </div>`;
 }
@@ -416,6 +484,36 @@ function mountReader(root, id) {
   // Actions
   $('#a-save', root).onclick = (e) => { const on = S.toggleSaved(id); e.currentTarget.setAttribute('aria-pressed', on); haptic(); toast(on ? 'Saved for later' : 'Removed from Saved', on); };
   $('#a-up', root).onclick = (e) => { const fb = S.setFeedback(id, 'up'); e.currentTarget.setAttribute('aria-pressed', fb === 'up'); haptic(); if (fb) toast('Noted — more like this from your sources', true); };
+  const typeBtn = $('#a-type', root);
+  if (typeBtn) typeBtn.onclick = () => {
+    haptic();
+    const st = S.settings();
+    const seg = (key, opts) => `<div class="seg" role="radiogroup">${opts.map(([v, label]) =>
+      `<button role="radio" aria-checked="${st[key] === v}" data-type-set="${key}" data-type-val="${v}">${label}</button>`).join('')}</div>`;
+    sheet(`<h2>Reading</h2>
+      <p>Type</p>${seg('readingFont', [['serif', 'Serif'], ['sans', 'Sans']])}
+      <p>Size</p>${seg('textSize', [['s', 'Small'], ['m', 'Medium'], ['l', 'Large']])}
+      <div class="row-btns"><button class="btn primary" id="s-done">Done</button></div>`, { '#s-done': () => {} });
+    $$('[data-type-set]', $('#sheet')).forEach(b => b.onclick = () => {
+      S.setSetting(b.dataset.typeSet, b.dataset.typeVal);
+      applyPrefs();
+      $$(`[data-type-set="${b.dataset.typeSet}"]`, $('#sheet')).forEach(x => x.setAttribute('aria-checked', String(x === b)));
+      haptic();
+    });
+  };
+
+  $('#a-share', root).onclick = async () => {
+    const data = { title: item.title, text: `${item.title} — ${srcName(item)}`, url: item.url };
+    if (navigator.share) {
+      try { await navigator.share(data); return; } catch (e) { if (e && e.name === 'AbortError') return; }
+    }
+    try { await navigator.clipboard.writeText(item.url); toast('Link copied', true); }
+    catch (e) {
+      sheet(`<h2>Share</h2><p style="text-transform:none;letter-spacing:0;font-size:15px;color:var(--ink-2);font-weight:400">Copy the link to this piece:</p><input class="share-url" value="${esc(item.url)}" readonly><div class="row-btns"><button class="btn primary" id="s-ok">Done</button></div>`, { '#s-ok': () => {} });
+      const inp = $('#sheet .share-url'); if (inp) inp.select();
+    }
+  };
+
   mountNotes(root, item);
 
   // Finish / unfinish
@@ -601,8 +699,68 @@ function render() {
   if (name === 'item') mountReader(root, arg);
   if (backStack[backStack.length - 1] !== hash) backStack.push(hash);
   window.scrollTo({ top: 0, behavior: 'instant' }); // readers restore their own position after this
-  const titles = { home: 'Curated', new: 'All New', topics: 'Topics', topic: 'Topics', saved: 'Saved', sources: 'Sources', reading: 'Currently Reading', archive: 'Archive', settings: 'Settings' };
+  const titles = { home: 'Curated', new: 'All New', topics: 'Topics', topic: 'Topics', saved: 'Saved', sources: 'Sources', reading: 'Currently Reading', archive: 'Archive', settings: 'Settings', notes: 'Notebook' };
   document.title = name === 'item' ? `${S.itemById(arg)?.title || 'Curated'} — Curated` : (titles[name] === 'Curated' ? 'Curated' : `${titles[name] || 'Curated'} — Curated`);
+}
+
+/* ---------- Pull to refresh ----------
+   Only when the page is already at the top and the reader isn't open, so it
+   never fights with scrolling or with the notes drawer. */
+let refreshing = false;
+function installPullToRefresh() {
+  const el = document.createElement('div');
+  el.className = 'ptr';
+  el.innerHTML = `<span class="ptr-ring">${I.refresh}</span>`;
+  document.body.appendChild(el);
+
+  let startY = 0, pulling = false, dist = 0;
+  const THRESHOLD = 72;
+
+  const reset = (instant) => {
+    pulling = false; dist = 0;
+    el.style.transition = instant ? 'none' : 'transform .3s var(--ease), opacity .3s var(--ease)';
+    el.style.transform = ''; el.style.opacity = '';
+    el.classList.remove('ready');
+  };
+
+  window.addEventListener('touchstart', (e) => {
+    if (refreshing || e.touches.length !== 1) return;
+    if (window.scrollY > 0 || document.body.classList.contains('reading')) return;
+    startY = e.touches[0].clientY; pulling = true; dist = 0;
+    el.style.transition = 'none';
+  }, { passive: true });
+
+  window.addEventListener('touchmove', (e) => {
+    if (!pulling) return;
+    dist = e.touches[0].clientY - startY;
+    if (dist <= 0) { reset(true); return; }
+    const pull = Math.min(dist * 0.5, 110);          // resistance
+    el.style.transform = `translate(-50%, ${pull}px) rotate(${pull * 3}deg)`;
+    el.style.opacity = String(Math.min(1, pull / 50));
+    el.classList.toggle('ready', pull >= THRESHOLD * 0.5);
+  }, { passive: true });
+
+  window.addEventListener('touchend', async () => {
+    if (!pulling) return;
+    const go = el.classList.contains('ready');
+    pulling = false;
+    if (!go) { reset(); return; }
+    refreshing = true;
+    el.classList.add('spinning');
+    el.style.transition = 'transform .2s var(--ease)';
+    el.style.transform = 'translate(-50%, 56px)';
+    const before = S.allNew().length;
+    const ok = await loadContent();
+    S.syncSources(!!ok);
+    el.classList.remove('spinning');
+    reset();
+    refreshing = false;
+    if (ok) {
+      render();
+      const added = S.allNew().length - before;
+      toast(added > 0 ? `${added} new ${added === 1 ? 'piece' : 'pieces'}` : 'You\u2019re up to date', added > 0);
+    } else toast('Couldn\u2019t reach your sources');
+  }, { passive: true });
 }
 
 function applyPrefs() {
@@ -610,6 +768,7 @@ function applyPrefs() {
   const root = document.documentElement;
   if (st.theme === 'system') root.removeAttribute('data-theme'); else root.setAttribute('data-theme', st.theme);
   root.style.setProperty('--reading-scale', { s: '0.92', m: '1', l: '1.12' }[st.textSize] || '1');
+  root.style.setProperty('--reading-font', st.readingFont === 'sans' ? 'var(--sans)' : 'var(--serif)');
   const dark = st.theme === 'dark' || (st.theme === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
   $$('meta[name="theme-color"]').forEach(m => m.setAttribute('content', dark ? '#121110' : '#f6f4ef'));
 }
@@ -633,6 +792,7 @@ async function boot() {
   S.syncSources(true);
   window.removeEventListener('hashchange', render);
   window.addEventListener('hashchange', render);
+  installPullToRefresh();
   render();
 }
 boot();
