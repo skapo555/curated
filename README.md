@@ -12,7 +12,7 @@ Any static file server works. From this folder:
 python3 -m http.server 8745
 ```
 
-Then open http://localhost:8745 — or, on your iPhone on the same Wi‑Fi, `http://<your-mac's-ip>:8745`, and use Share → **Add to Home Screen** to install it as a standalone app.
+Live at **https://thecurated.fyi**. For local work: http://localhost:8745 — or, on your iPhone on the same Wi‑Fi, `http://<your-mac's-ip>:8745`, and use Share → **Add to Home Screen** to install it as a standalone app.
 
 ## What's in the loop
 
