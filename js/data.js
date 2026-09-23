@@ -18,6 +18,16 @@ export const TOPICS = [
 export const SOURCES = [];
 export const ITEMS = [];
 
+/* Where a source looks, not where it is published from. The Sources screen
+   groups by this so the shape of your reading is visible at a glance. */
+export const REGIONS = [
+  { id: 'australia',   name: 'Australia',     blurb: 'Home — politics, policy and Australia in the world.' },
+  { id: 'india',       name: 'India',         blurb: 'India as a power: its foreign policy and the wider order.' },
+  { id: 'asiapacific', name: 'Asia-Pacific',  blurb: 'The neighbourhood — Southeast Asia, the Pacific, East Asia.' },
+  { id: 'global',      name: 'Wider world',   blurb: 'Everything else, when the stakes reach this far.' },
+];
+export const regionById = (id) => REGIONS.find(r => r.id === id);
+
 export const SOURCE_TYPE_LABEL = {
   publication: 'Publication', blog: 'Blog', youtube: 'YouTube channel', website: 'Website', research: 'Research',
 };

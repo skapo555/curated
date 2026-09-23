@@ -3,6 +3,7 @@
     "id": "interpreter",
     "name": "The Interpreter",
     "type": "research",
+    "region": "australia",
     "tagline": "Lowy Institute analysis on Australia in the world.",
     "feed": "https://www.lowyinstitute.org/the-interpreter/rss.xml",
     "home": "https://www.lowyinstitute.org/the-interpreter"
@@ -11,6 +12,7 @@
     "id": "conversation",
     "name": "The Conversation",
     "type": "website",
+    "region": "australia",
     "tagline": "Academic experts on business and the economy, Australian edition.",
     "feed": "https://theconversation.com/au/business/articles.atom",
     "home": "https://theconversation.com/au/business"
@@ -19,6 +21,7 @@
     "id": "diplomat",
     "name": "The Diplomat",
     "type": "publication",
+    "region": "asiapacific",
     "tagline": "Asia-Pacific current affairs.",
     "feed": "https://thediplomat.com/feed/",
     "home": "https://thediplomat.com"
@@ -27,6 +30,7 @@
     "id": "strategist",
     "name": "The Strategist",
     "type": "research",
+    "region": "australia",
     "tagline": "ASPI’s commentary on defence and security.",
     "feed": "https://www.aspistrategist.org.au/feed/",
     "home": "https://www.aspistrategist.org.au"
@@ -35,6 +39,7 @@
     "id": "fulcrum",
     "name": "Fulcrum",
     "type": "research",
+    "region": "asiapacific",
     "tagline": "ISEAS analysis on Southeast Asia, from Singapore.",
     "feed": "https://fulcrum.sg/feed/",
     "home": "https://fulcrum.sg"
@@ -43,6 +48,7 @@
     "id": "insidestory",
     "name": "Inside Story",
     "type": "publication",
+    "region": "australia",
     "tagline": "Current affairs and culture from Australia, at length.",
     "feed": "https://insidestory.org.au/feed/",
     "home": "https://insidestory.org.au"
@@ -51,6 +57,7 @@
     "id": "abc",
     "name": "ABC News",
     "type": "publication",
+    "region": "australia",
     "tagline": "Australia’s public broadcaster — top stories.",
     "feed": "https://www.abc.net.au/news/feed/45910/rss.xml",
     "home": "https://www.abc.net.au/news"
@@ -59,6 +66,7 @@
     "id": "caspian",
     "name": "Caspian Report",
     "type": "youtube",
+    "region": "global",
     "tagline": "Geopolitics explained through history and geography.",
     "feed": "https://www.youtube.com/feeds/videos.xml?channel_id=UCwnKziETDbHJtx78nIkfYug",
     "home": "https://www.youtube.com/@CaspianReport"
@@ -67,6 +75,7 @@
     "id": "perun",
     "name": "Perun",
     "type": "youtube",
+    "region": "global",
     "tagline": "Long-form defence economics, one PowerPoint at a time.",
     "feed": "https://www.youtube.com/feeds/videos.xml?channel_id=UCC3ehuUksTyQ7bbjGntmx3Q",
     "home": "https://www.youtube.com/@PerunAU"
@@ -75,6 +84,7 @@
     "id": "foreignaffairs",
     "name": "Foreign Affairs",
     "type": "publication",
+    "region": "global",
     "tagline": "Essays on international relations and grand strategy. Paywalled — headlines here, read on the site.",
     "feed": "https://www.foreignaffairs.com/rss.xml",
     "home": "https://www.foreignaffairs.com",
@@ -84,6 +94,7 @@
     "id": "monthly",
     "name": "The Monthly",
     "type": "publication",
+    "region": "australia",
     "tagline": "Australian politics, society and culture. Paywalled — headlines here, read on the site.",
     "feed": "https://www.themonthly.com.au/feed.xml",
     "home": "https://www.themonthly.com.au",
@@ -93,6 +104,7 @@
     "id": "eastasiaforum",
     "name": "East Asia Forum",
     "type": "research",
+    "region": "asiapacific",
     "tagline": "ANU’s forum on economics and policy across Asia.",
     "feed": "https://eastasiaforum.org/feed/",
     "home": "https://eastasiaforum.org",
@@ -102,6 +114,7 @@
     "id": "frontline",
     "name": "Frontline",
     "type": "publication",
+    "region": "india",
     "tagline": "The Hindu's magazine on world affairs — India's view of the wider world.",
     "feed": "https://frontline.thehindu.com/world-affairs/feeder/default.rss",
     "home": "https://frontline.thehindu.com/world-affairs/"
@@ -110,6 +123,7 @@
     "id": "newmandala",
     "name": "New Mandala",
     "type": "research",
+    "region": "asiapacific",
     "tagline": "ANU scholarship on Southeast Asian politics and society, at length.",
     "feed": "https://www.newmandala.org/feed/",
     "home": "https://www.newmandala.org"
@@ -118,6 +132,7 @@
     "id": "devpolicy",
     "name": "Devpolicy Blog",
     "type": "research",
+    "region": "asiapacific",
     "tagline": "ANU's Development Policy Centre on the Pacific, PNG and aid.",
     "feed": "https://devpolicy.org/feed/",
     "home": "https://devpolicy.org"
@@ -126,6 +141,7 @@
     "id": "sbsworld",
     "name": "SBS World News",
     "type": "publication",
+    "region": "global",
     "tagline": "International news with an Australian lens.",
     "feed": "https://www.sbs.com.au/news/topic/world/feed",
     "home": "https://www.sbs.com.au/news/topic/world"
@@ -134,8 +150,33 @@
     "id": "gatewayhouse",
     "name": "Gateway House",
     "type": "research",
+    "region": "india",
     "tagline": "Indian Council on Global Relations — India's foreign policy and economic diplomacy.",
     "feed": "https://www.gatewayhouse.in/feed/",
     "home": "https://www.gatewayhouse.in"
+  },
+  {
+    "id": "orf",
+    "name": "Observer Research Foundation",
+    "type": "research",
+    "region": "india",
+    "tagline": "India's largest think tank on foreign policy, energy and the world order.",
+    "feed": "https://www.orfonline.org/expert-speak-sitemap.xml",
+    "feedType": "sitemap",
+    "match": "/expert-speak/",
+    "home": "https://www.orfonline.org/expert-speak",
+    "datedSitemap": true,
+    "exclude": "energy-news-monitor|-sitemap|/tag/"
+  },
+  {
+    "id": "asialink",
+    "name": "Asialink Insights",
+    "type": "research",
+    "region": "asiapacific",
+    "tagline": "University of Melbourne's centre for Australia's engagement with Asia.",
+    "feed": "https://asialink.unimelb.edu.au/sitemap.xml",
+    "feedType": "sitemap",
+    "match": "/insights/[^/]+/",
+    "home": "https://asialink.unimelb.edu.au/diplomacy/insights"
   }
 ]

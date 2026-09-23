@@ -38,6 +38,7 @@ NS = {
     "atom": "http://www.w3.org/2005/Atom",
     "content": "http://purl.org/rss/1.0/modules/content/",
     "dc": "http://purl.org/dc/elements/1.1/",
+    "sm": "http://www.sitemaps.org/schemas/sitemap/0.9",
     "media": "http://search.yahoo.com/mrss/",
     "yt": "http://www.youtube.com/xml/schemas/2015",
 }
@@ -130,6 +131,93 @@ def parse_feed(xml_bytes):
                 "published": parse_date(text(it, "pubDate") or text(it, "dc:date")),
                 "image": img, "yt_id": "",
             }
+
+class Budget:
+    """One fetch per article, ever. The cap is per run, not per source, so a
+    site with a large back catalogue fills in over a few runs instead of
+    hammering the publisher once."""
+    def __init__(self, n): self.left, self.used = n, 0
+    def take(self):
+        if self.left <= 0: return False
+        self.left -= 1; self.used += 1
+        return True
+
+def page_meta(page, url):
+    """Title, date, author, dek and image for a page we have no feed for."""
+    meta = {"title": "", "date": None, "author": "", "summary": "", "image": ""}
+    if trafilatura:
+        try:
+            raw = trafilatura.extract(page, url=url, output_format="json",
+                                      include_comments=False, with_metadata=True)
+            if raw:
+                d = json.loads(raw)
+                meta["title"] = (d.get("title") or "").strip()
+                meta["date"] = parse_date(d.get("date") or "")
+                meta["author"] = (d.get("author") or "").split(";")[-1].strip()
+                meta["summary"] = (d.get("description") or "").strip()
+                meta["image"] = d.get("image") or ""
+        except Exception: pass
+    if not meta["image"]: meta["image"] = og_image(page)
+    if not meta["title"]:
+        m = re.search(r"<title[^>]*>(.*?)</title>", page, re.S | re.I)
+        if m: meta["title"] = html.unescape(strip_html(m.group(1))).split(" | ")[0].strip()
+    return meta
+
+SEEN_FILE = os.path.join(DATA, "seen.json")
+
+def load_seen():
+    """Publication dates for sitemap URLs we have already looked at. Without
+    this, an article that ages out of the window would be re-fetched on every
+    run forever, because it is still listed in the sitemap."""
+    try:
+        with open(SEEN_FILE) as f: return json.load(f)
+    except Exception: return {}
+
+def sitemap_entries(src, known, budget, seen):
+    """For publishers that offer no RSS. A sitemap gives URLs and little else —
+    often a <lastmod> that is the site's last build, not the publication date —
+    so title, date and author are read from the article itself, once."""
+    raw, _ = fetch(src["feed"])
+    keep = re.compile(src.get("match", "."))
+    drop = re.compile(src["exclude"]) if src.get("exclude") else None
+    rows = []
+    for u in ET.fromstring(raw).findall("sm:url", NS):
+        loc = text(u, "sm:loc")
+        if not loc or not keep.search(loc): continue
+        if drop and drop.search(loc): continue      # recurring bulletins, not pieces
+        rows.append((loc, parse_date(text(u, "sm:lastmod"))))
+    old = datetime(1970, 1, 1, tzinfo=timezone.utc)
+    rows.sort(key=lambda r: r[1] or old, reverse=True)
+    cutoff = datetime.now(timezone.utc) - timedelta(days=WINDOW_DAYS)
+    fresh = sum(1 for _, lm in rows if not lm or lm >= cutoff)
+    log(f"   sitemap: {len(rows)} matching URLs")
+    skipped = 0
+    for loc, lastmod in rows[: MAX_PER_SOURCE * 3]:
+        prior = known.get(item_id(loc))
+        if prior:
+            yield {"url": loc, "title": prior["title"], "summary": "", "content": "",
+                   "author": prior.get("author") or "", "published": parse_date(prior["publishedAt"]),
+                   "image": prior.get("image", ""), "yt_id": "", "page": None}
+            continue
+        # already looked at once and it turned out to be older than the window
+        was = parse_date(seen.get(loc, ""))
+        if was and was < cutoff:
+            skipped += 1; continue
+        if lastmod and lastmod < cutoff and src.get("datedSitemap"):
+            skipped += 1; continue
+        if not budget.take(): continue
+        try:
+            page = fetch(loc)[0].decode("utf-8", "ignore")
+        except Exception as e:
+            log("   ! page fetch failed:", loc, e); continue
+        m = page_meta(page, loc)
+        seen[loc] = (m["date"] or lastmod or datetime.now(timezone.utc)).isoformat()
+        if not m["title"]: continue
+        time.sleep(0.4)
+        yield {"url": loc, "title": m["title"], "summary": m["summary"], "content": "",
+               "author": m["author"], "published": m["date"] or lastmod,
+               "image": m["image"], "yt_id": "", "page": page}
+    if skipped: log(f"   skipped {skipped} known to be outside the window")
 
 # ---------------------------------------------------------------- articles
 def blocks_from_xml(xml_str):
@@ -251,13 +339,12 @@ def best_blocks(html_str, url=None):
     if len(cands) == 2 and words_in(cands[0]) >= 150: return cands[0]
     return max(cands, key=words_in)
 
-def extract_article(url, feed_content, fetch_page=True):
+def extract_article(url, feed_content, fetch_page=True, page=None):
     """Returns (blocks, image, ok). Prefers full text shipped in the feed."""
     blocks, image = [], ""
     if feed_content and len(strip_html(feed_content)) > 1500:
         blocks = best_blocks(feed_content)
-    page = None
-    if fetch_page and (words_in(blocks) < 150 or not image):
+    if page is None and fetch_page and (words_in(blocks) < 150 or not image):
         try:
             page, _ = fetch(url)
             page = page.decode("utf-8", "ignore")
@@ -404,7 +491,9 @@ def main():
             old_index = {i["id"]: i for i in json.load(f).get("items", [])}
 
     cutoff = datetime.now(timezone.utc) - timedelta(days=WINDOW_DAYS)
-    items, fetched, source_status = [], 0, {}
+    items, source_status = [], {}
+    budget = Budget(FETCH_BUDGET)
+    seen = load_seen()
 
     for src in sources:
         if src.get("unavailable"):
@@ -413,7 +502,11 @@ def main():
         entries = None
         for attempt in (1, 2):
             try:
-                raw, _ = fetch(src["feed"]); entries = list(parse_feed(raw)); break
+                if src.get("feedType") == "sitemap":
+                    entries = list(sitemap_entries(src, old_index, budget, seen))
+                else:
+                    entries = list(parse_feed(fetch(src["feed"])[0]))
+                break
             except Exception as e:
                 log(f"   ! feed failed (attempt {attempt}):", e); time.sleep(3)
         if entries is None:
@@ -433,9 +526,9 @@ def main():
             item_file = os.path.join(ITEMS_DIR, iid + ".json")
             if existing and os.path.exists(item_file):
                 items.append(existing); count += 1; continue
-            if fetched >= FETCH_BUDGET:
+            # a sitemap source has already spent its fetch reading the page
+            if e.get("page") is None and not budget.take():
                 continue  # picked up next run
-            fetched += 1
             title = html.unescape(e["title"]).strip()
             try:
                 if is_video:
@@ -460,7 +553,7 @@ def main():
                                 pg, _ = fetch(e["url"]); image = og_image(pg.decode("utf-8", "ignore"))
                             except Exception: pass
                     else:
-                        blocks, image, ok = extract_article(e["url"], e["content"] or e["summary"])
+                        blocks, image, ok = extract_article(e["url"], e["content"] or e["summary"], page=e.get("page"))
                         blocks = dedupe(blocks, title, e["summary"]); ok = words_in(blocks) >= 120
                     words = sum(len(b["text"].split()) for b in blocks)
                     item = {
@@ -490,11 +583,12 @@ def main():
     index = {
         "generatedAt": datetime.now(timezone.utc).isoformat(),
         "windowDays": WINDOW_DAYS,
-        "sources": [{k: s[k] for k in ("id", "name", "type", "tagline", "home", "unavailable", "metadataOnly") if k in s} | {"status": source_status.get(s["id"], "ok")} for s in sources],
+        "sources": [{k: s[k] for k in ("id", "name", "type", "region", "tagline", "home", "unavailable", "metadataOnly") if k in s} | {"status": source_status.get(s["id"], "ok")} for s in sources],
         "items": items,
     }
     with open(idx_path, "w") as f: json.dump(index, f, ensure_ascii=False)
-    log(f"\n{len(items)} items, {fetched} fetched this run, {len(sources)} sources → data/index.json")
+    with open(SEEN_FILE, "w") as f: json.dump(seen, f)
+    log(f"\n{len(items)} items, {budget.used} fetched this run, {len(sources)} sources → data/index.json")
 
 if __name__ == "__main__":
     main()

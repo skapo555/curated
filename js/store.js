@@ -27,6 +27,7 @@ const DEFAULTS = () => ({
     pickCount: 10,        // how many Home surfaces at once
   },
   liveSynced: false,
+  onboarded: false,     // has this device chosen its sources yet?
   surfaced: {},         // itemId -> day it was first shown on Home
   at: { items: {}, followed: {}, notes: {}, settings: {} },
   syncedAt: 0,          // server time of the last successful pull
@@ -40,6 +41,9 @@ function load() {
     if (raw) {
       const parsed = JSON.parse(raw);
       const d = DEFAULTS();
+      // Anyone already reading here has effectively chosen already — don't
+      // interrupt them with a picker for a decision they've made.
+      if (!('onboarded' in parsed)) parsed.onboarded = !!parsed.liveSynced || Object.keys(parsed.followed || {}).length > 0;
       return { ...d, ...parsed, settings: { ...d.settings, ...(parsed.settings || {}) }, at: { ...d.at, ...(parsed.at || {}) } };
     }
   } catch (e) { /* fall through to fresh state */ }
@@ -91,20 +95,35 @@ export const settings = () => state.settings;
 /* Call after live content replaces SOURCES so new sources get a follow default. */
 export function syncSources(live = false) {
   let changed = false;
-  if (live && !state.liveSynced) {
-    // First time real sources arrive: start from their defaults, not the mock era's follows.
-    for (const s of SOURCES) state.followed[s.id] = s.followed;
-    state.liveSynced = true; changed = true;
+  if (live && !state.liveSynced) { state.liveSynced = true; changed = true; }
+  // A source nobody has ruled on yet: off until this device has been through
+  // the picker, on afterwards, so a source added later isn't silently hidden.
+  for (const s of SOURCES) if (!(s.id in state.followed)) {
+    state.followed[s.id] = state.onboarded ? !s.unavailable : false; changed = true;
   }
-  for (const s of SOURCES) if (!(s.id in state.followed)) { state.followed[s.id] = s.followed; changed = true; }
   if (changed) save();
+}
+
+export const isOnboarded = () => !!state.onboarded;
+
+/* The picker's only job is to record a deliberate choice. */
+export function completeOnboarding(ids) {
+  const now = Date.now();
+  for (const s of SOURCES) {
+    const yes = ids.includes(s.id) && !s.unavailable;
+    state.followed[s.id] = yes;
+    state.at.followed[s.id] = now;
+  }
+  state.onboarded = true;
+  save();
 }
 
 export function resetAll() {
   const followed = state.followed;
   state = DEFAULTS();
-  state.followed = Object.fromEntries(SOURCES.map(s => [s.id, !s.unavailable]));
+  state.followed = {};
   state.liveSynced = true;
+  state.onboarded = false;
   save();
 }
 
@@ -540,6 +559,9 @@ export function mergeRemote(remote, { markSynced = 0 } = {}) {
       changed.follows++;
     }
   }
+  // Sources arriving from another device are a choice already made — a new
+  // device signing in should land in the reading, not in the picker.
+  if ((remote.follows || []).length) state.onboarded = true;
 
   const rs = remote.settings || {}, rsAt = remote.settingsAt || {};
   for (const [k, v] of Object.entries(rs)) {

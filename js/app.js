@@ -1,6 +1,6 @@
 /* Curated — app shell, router and screens. No framework, no build step. */
 
-import { ITEMS, SOURCES, TOPICS, SOURCE_TYPE_LABEL, imageFor, CONTENT, loadContent, loadItemDetail } from './data.js';
+import { ITEMS, SOURCES, TOPICS, REGIONS, SOURCE_TYPE_LABEL, imageFor, CONTENT, loadContent, loadItemDetail } from './data.js';
 import * as S from './store.js';
 import * as A from './auth.js';
 import * as Sync from './sync.js';
@@ -399,28 +399,103 @@ screens.source.mount = (root) => {
 };
 
 let sourceQuery = '';
+function sourceRow(s) {
+  const { tone } = imageFor({ img: s.id });
+  const f = S.isFollowed(s.id), un = s.unavailable, n = S.itemsForSource(s.id).length;
+  return `<div class="source-row ${un ? 'unavailable' : ''}">
+    <a class="source-open" href="#/source/${s.id}" aria-label="${esc(s.name)}">
+      <div class="avatar ${s.type === 'youtube' ? 'yt' : ''}" style="--tone:${tone}" aria-hidden="true">${esc(s.name[0])}</div>
+      <div class="t"><h3>${esc(s.name)}</h3><p>${esc(s.tagline)}</p>
+        <div class="type">${SOURCE_TYPE_LABEL[s.type]}${un ? ` · <span class="warn">Unavailable — ${esc(un)}</span>` : s.metadataOnly ? ' · Headlines only' : ''}${n && !un ? ` · ${n} pieces` : ''}</div></div>
+    </a>
+    ${un ? '' : `<button class="btn sm ${f ? 'ghost' : 'primary'}" data-follow="${s.id}" aria-pressed="${f}">${f ? 'Following' : 'Follow'}</button>`}</div>`;
+}
+
+/* ---- First run: choose your sources before anything is chosen for you ---- */
+let welcomePick = null;   // Set of source ids, built lazily from what's available
+
+screens.welcome = () => {
+  document.body.classList.add('welcoming');
+  if (!welcomePick) welcomePick = new Set();
+  const avail = SOURCES.filter(s => !s.unavailable);
+  const groups = REGIONS.map(r => ({ ...r, list: avail.filter(s => (s.region || 'global') === r.id).sort((a, b) => a.name.localeCompare(b.name)) })).filter(g => g.list.length);
+  const n = welcomePick.size;
+
+  const row = (s) => {
+    const { tone } = imageFor({ img: s.id });
+    const on = welcomePick.has(s.id);
+    return `<button class="pick-row ${on ? 'on' : ''}" data-pick="${s.id}" aria-pressed="${on}">
+      <span class="avatar ${s.type === 'youtube' ? 'yt' : ''}" style="--tone:${tone}" aria-hidden="true">${esc(s.name[0])}</span>
+      <span class="t"><strong>${esc(s.name)}</strong><small>${esc(s.tagline)}</small></span>
+      <span class="tick" aria-hidden="true">${I.check || ''}</span></button>`;
+  };
+
+  return `<div class="welcome">
+    <header class="welcome-head">
+      <span class="wordmark">curated</span>
+      <h1>Who do you trust?</h1>
+      <p>Curated never draws from anywhere you haven’t chosen. Pick as few or as many as you like — you can change this whenever you want.</p>
+    </header>
+    ${groups.map(g => `<section class="pick-group">
+      <div class="region-head"><div><h2 class="kicker">${esc(g.name)}</h2><p class="region-blurb">${esc(g.blurb)}</p></div>
+      <button class="link-btn" data-all="${g.id}">${g.list.every(s => welcomePick.has(s.id)) ? 'None' : 'All'}</button></div>
+      <div class="pick-list">${g.list.map(row).join('')}</div></section>`).join('')}
+    <div class="welcome-foot">
+      <button class="btn primary lg" id="w-go" ${n ? '' : 'disabled'}>${n ? `Start reading · ${n} source${n === 1 ? '' : 's'}` : 'Choose at least one'}</button>
+      <button class="link-btn" id="w-skip">Skip — I’ll pick later</button>
+    </div></div>`;
+};
+
+screens.welcome.mount = (root) => {
+  const again = () => { const y = window.scrollY; render(); window.scrollTo(0, y); };
+  $$('[data-pick]', root).forEach(b => b.onclick = () => {
+    const id = b.dataset.pick;
+    welcomePick.has(id) ? welcomePick.delete(id) : welcomePick.add(id);
+    haptic(); again();
+  });
+  $$('[data-all]', root).forEach(b => b.onclick = () => {
+    const list = SOURCES.filter(s => !s.unavailable && (s.region || 'global') === b.dataset.all);
+    const allOn = list.every(s => welcomePick.has(s.id));
+    list.forEach(s => allOn ? welcomePick.delete(s.id) : welcomePick.add(s.id));
+    haptic(); again();
+  });
+  const done = (ids) => {
+    S.completeOnboarding(ids);
+    document.body.classList.remove('welcoming');
+    welcomePick = null;
+    Sync.nudge();
+    location.hash = '#/';
+    render();
+  };
+  $('#w-go', root).onclick = () => { if (welcomePick.size) done([...welcomePick]); };
+  $('#w-skip', root).onclick = () => done([]);
+};
+
 screens.sources = () => {
   renderNav('sources');
   const q = sourceQuery.trim().toLowerCase();
-  const all = SOURCES.slice().sort((a, b) => a.name.localeCompare(b.name));
   const match = (s) => !q || s.name.toLowerCase().includes(q) || s.tagline.toLowerCase().includes(q) || SOURCE_TYPE_LABEL[s.type].toLowerCase().includes(q);
-  const followed = all.filter(s => S.isFollowed(s.id) && match(s));
-  const discover = all.filter(s => !S.isFollowed(s.id) && match(s));
-  const row = (s) => { const { tone } = imageFor({ img: s.id }); const f = S.isFollowed(s.id); const un = s.unavailable; const n = S.itemsForSource(s.id).length;
-    return `<div class="source-row ${un ? 'unavailable' : ''}">
-      <a class="source-open" href="#/source/${s.id}" aria-label="${esc(s.name)}">
-        <div class="avatar ${s.type === 'youtube' ? 'yt' : ''}" style="--tone:${tone}" aria-hidden="true">${esc(s.name[0])}</div>
-        <div class="t"><h3>${esc(s.name)}</h3><p>${esc(s.tagline)}</p>
-          <div class="type">${SOURCE_TYPE_LABEL[s.type]}${un ? ` · <span class="warn">Unavailable — ${esc(un)}</span>` : s.metadataOnly ? ' · Headlines only' : ''}${n && !un ? ` · ${n} pieces` : ''}</div></div>
-      </a>
-      ${un ? '' : `<button class="btn sm ${f ? 'ghost' : 'primary'}" data-follow="${s.id}" aria-pressed="${f}">${f ? 'Following' : 'Follow'}</button>`}</div>`; };
+  const all = SOURCES.filter(match).sort((a, b) => a.name.localeCompare(b.name));
+  const groups = REGIONS.map(r => ({ ...r, list: all.filter(s => (s.region || 'global') === r.id) })).filter(g => g.list.length);
+  const following = all.filter(s => S.isFollowed(s.id)).length;
+
+  const group = (g) => {
+    const on = g.list.filter(s => S.isFollowed(s.id)).length;
+    return `<section class="section region">
+      <div class="section-head region-head">
+        <div><h2 class="kicker">${esc(g.name)}</h2><p class="region-blurb">${esc(g.blurb)}</p></div>
+        <span class="region-count">${on} of ${g.list.length}</span>
+      </div>
+      <div class="list">${g.list.map(sourceRow).join('')}</div></section>`;
+  };
+
   return pageHead('Sources', 'You decide who you trust. Curated only ever draws from this list.') +
     `<div class="search">${I.search}<input type="search" id="src-q" placeholder="Search sources…" value="${esc(sourceQuery)}" autocomplete="off"></div>
-    ${q && !followed.length && !discover.length ? `<div class="empty">No source called “${esc(sourceQuery)}”.<small>Soon you’ll be able to paste any website or channel URL to follow it.</small></div>` : ''}
-    ${followed.length ? `<section class="section"><div class="section-head"><h2 class="kicker">Following · ${followed.length}</h2></div><div class="list">${followed.map(row).join('')}</div></section>` : ''}
-    ${discover.length ? `<section class="section"><div class="section-head"><h2 class="kicker">${q ? 'Results' : 'Worth considering'}</h2></div><div class="list">${discover.map(row).join('')}</div></section>` : ''}
-    <p class="hint">Following a source adds everything it publishes to All New and makes it eligible for your three. Unfollowing removes it everywhere — nothing sneaks back in.</p>`;
+    ${!all.length ? `<div class="empty">No source called “${esc(sourceQuery)}”.<small>Soon you’ll be able to paste any website or channel URL to follow it.</small></div>` : ''}
+    ${groups.map(group).join('')}
+    ${all.length ? `<p class="hint">Following ${following} of ${SOURCES.length}. Following a source adds everything it publishes to All New and makes it eligible for your picks. Unfollowing removes it everywhere — nothing sneaks back in.</p>` : ''}`;
 };
+
 screens.sources.mount = (root) => {
   const input = $('#src-q', root);
   input.oninput = () => { sourceQuery = input.value; const pos = input.selectionStart; render(); const el = $('#src-q'); el.focus(); el.setSelectionRange(pos, pos); };
@@ -834,7 +909,10 @@ function route() {
 }
 
 function render() {
-  const { name, arg, hash } = route();
+  let { name, arg, hash } = route();
+  // Nothing is chosen for you: a device that hasn't picked its sources
+  // sees the picker first, whatever it asked for.
+  if (CONTENT.live && !S.isOnboarded() && name !== 'welcome') { name = 'welcome'; arg = null; }
   if (reader) { reader.cleanup(); reader = null; }
   const prevRoot = $('#main'); if (prevRoot._notesCleanup) { prevRoot._notesCleanup(); prevRoot._notesCleanup = null; }
   document.body.classList.remove('reading', 'notes-open', 'notes-min');
