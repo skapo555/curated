@@ -60,7 +60,35 @@
     "region": "australia",
     "tagline": "Australia’s public broadcaster — top stories.",
     "feed": "https://www.abc.net.au/news/feed/45910/rss.xml",
-    "home": "https://www.abc.net.au/news"
+    "home": "https://www.abc.net.au/news",
+    "minMinutes": 4,
+    "excludeCategories": [
+      "Courts",
+      "Police",
+      "Crime",
+      "Domestic Violence",
+      "Prisons and Punishment",
+      "Law, Crime and Justice",
+      "Sport",
+      "Rugby League",
+      "AFL",
+      "Cricket",
+      "Soccer",
+      "Celebrity",
+      "Music",
+      "Arts and Entertainment",
+      "Television",
+      "Film",
+      "Death and Dying",
+      "Obituaries",
+      "Weather",
+      "Bushfires",
+      "Accidents",
+      "Missing Person",
+      "Sexual Offences",
+      "Assault",
+      "Drug Offences"
+    ]
   },
   {
     "id": "caspian",
@@ -144,7 +172,15 @@
     "region": "global",
     "tagline": "International news with an Australian lens.",
     "feed": "https://www.sbs.com.au/news/topic/world/feed",
-    "home": "https://www.sbs.com.au/news/topic/world"
+    "home": "https://www.sbs.com.au/news/topic/world",
+    "minMinutes": 4,
+    "excludeCategories": [
+      "Sport",
+      "Celebrity",
+      "Life",
+      "Culture",
+      "Food"
+    ]
   },
   {
     "id": "gatewayhouse",

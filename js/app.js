@@ -1,6 +1,6 @@
 /* Curated — app shell, router and screens. No framework, no build step. */
 
-import { ITEMS, SOURCES, TOPICS, REGIONS, SOURCE_TYPE_LABEL, imageFor, CONTENT, loadContent, loadItemDetail } from './data.js';
+import { ITEMS, SOURCES, TOPICS, REGIONS, FEATURES, SOURCE_TYPE_LABEL, imageFor, CONTENT, loadContent, loadItemDetail } from './data.js';
 import * as S from './store.js';
 import * as A from './auth.js';
 import * as Sync from './sync.js';
@@ -121,18 +121,19 @@ document.addEventListener('error', (e) => {
 /* ============================================================ nav */
 const NAV_MAIN = [
   { id: 'today', href: '#/', label: 'Today', icon: I.today },
-  { id: 'know', href: '#/know', label: 'In the Know', icon: I.pulse },
+  { id: 'know', href: '#/know', label: 'In the Know', icon: I.pulse, feature: 'inTheKnow' },
+  { id: 'notes', href: '#/notes', label: 'Notebook', icon: I.notebook },
   { id: 'new', href: '#/new', label: 'All New', icon: I.browse },
   { id: 'saved', href: '#/saved', label: 'Saved', icon: I.saved },
   { id: 'sources', href: '#/sources', label: 'Sources', icon: I.sources },
-];
+].filter(n => !n.feature || FEATURES[n.feature]);
 const NAV_MORE = [
-  { id: 'notes', href: '#/notes', label: 'Notebook', icon: I.notebook },
+  { id: 'know', href: '#/know', label: 'In the Know', icon: I.pulse, feature: '!inTheKnow' },
   { id: 'topics', href: '#/topics', label: 'Topics', icon: I.topics },
   { id: 'reading', href: '#/reading', label: 'Currently Reading', icon: I.reading },
   { id: 'archive', href: '#/archive', label: 'Archive', icon: I.archive },
   { id: 'settings', href: '#/settings', label: 'Settings', icon: I.settings },
-];
+].filter(n => !n.feature || (n.feature[0] === '!' ? !FEATURES[n.feature.slice(1)] : FEATURES[n.feature]));
 function renderNav(active) {
   const link = (n) => `<a href="${n.href}" ${active === n.id ? 'aria-current="page"' : ''}>${n.icon}<span>${n.label}</span></a>`;
   $('#tabbar').innerHTML = NAV_MAIN.map(link).join('');
@@ -312,7 +313,7 @@ screens.notes = () => {
     const it = n.item;
     const when = n.at ? relTime(new Date(n.at).toISOString()) : '';
     return `<article class="note-card">
-      <div class="note-body">${esc(n.body)}</div>
+      <div class="note-body">${noteHTML(n.body)}</div>
       <div class="note-foot">
         ${it ? `<a class="note-src" href="#/item/${it.id}">${esc(srcName(it))} · ${esc(it.title)}</a>`
              : `<span class="note-src gone">The piece this belongs to has left your feed</span>`}
@@ -598,16 +599,72 @@ screens.settings.mount = (root) => {
 let reader = null; // { id, onScroll, timer, askedThisSession }
 const askedThisSession = new Set();
 
-const NOTE_PROMPTS = ['What is the author’s main argument?', 'What evidence convinced me?', 'What am I sceptical about?', 'What would change my mind?'];
+/* Questions to think against, not a form to fill in. Four show at a time,
+   drawn deterministically from the piece's id so they stay put while you read
+   it and differ from one piece to the next. Grouped so you always get one of
+   each kind rather than four variations on doubt. */
+const PROMPT_POOL = {
+  argument: [
+    'What is the author’s main argument?',
+    'What is the author claiming that others would dispute?',
+    'If I had to put this in one sentence, what would it be?',
+    'What question is this piece actually answering?',
+    'What does the author want me to do or believe differently?',
+  ],
+  evidence: [
+    'What evidence convinced me?',
+    'What is the strongest fact here?',
+    'What is asserted but not shown?',
+    'Whose voice is missing from this?',
+    'How would I check the central claim?',
+  ],
+  doubt: [
+    'What am I sceptical about?',
+    'What would the best counter-argument be?',
+    'What would change my mind?',
+    'Where does this conflict with something else I’ve read?',
+    'What is the author taking for granted?',
+  ],
+  connect: [
+    'What does this change about how I see the region?',
+    'Who else should read this, and why?',
+    'What does this connect to that I read earlier?',
+    'What would I want to know a year from now?',
+    'What is the second-order consequence nobody mentions?',
+  ],
+};
+function promptsFor(id) {
+  let h = 0; for (const ch of String(id)) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return Object.values(PROMPT_POOL).map((list, i) => list[(h >> (i * 3)) % list.length]);
+}
 /* End-of-piece preview: the reflection moment stays, editing happens in the drawer. */
 function notesHTML(item) {
   const note = S.noteOf(item.id);
   return `<section class="notes" aria-labelledby="nt"><div class="kicker" id="nt"><span>Your notes</span><span class="priv">Private · saved on this device</span></div>
     <div id="note-preview">${notePreviewHTML(note)}</div></section>`;
 }
+/* Notes are written and exported as Markdown. Only the three shapes the app
+   itself produces are rendered: a quoted passage, a question, and prose. */
+function noteHTML(text) {
+  const out = [];
+  let para = [];
+  const flush = () => { if (para.length) { out.push(`<p>${para.map(esc).join('<br>')}</p>`); para = []; } };
+  for (const raw of String(text || '').split('\n')) {
+    const line = raw.replace(/\s+$/, '');
+    if (!line.trim()) { flush(); continue; }
+    const q = line.match(/^>\s?(.*)$/);
+    const h = line.match(/^\*\*(.+?)\*\*$/);
+    if (q) { flush(); out.push(`<blockquote>${esc(q[1])}</blockquote>`); }
+    else if (h) { flush(); out.push(`<h4 class="note-q">${esc(h[1])}</h4>`); }
+    else para.push(line);
+  }
+  flush();
+  return out.join('');
+}
+
 function notePreviewHTML(note) {
   return note.trim()
-    ? `<div class="note-preview"><p>${esc(note)}</p><button class="btn ghost sm" data-open-notes>Edit note</button></div>`
+    ? `<div class="note-preview">${noteHTML(note)}<button class="btn ghost sm" data-open-notes>Edit note</button></div>`
     : `<div class="note-empty"><p>A thought, a quote, a question — while you read or once you’re done.</p><button class="btn ghost sm" data-open-notes>Add a note</button></div>`;
 }
 /* Floating notes drawer: bottom sheet on phones, side panel on desktop. */
@@ -620,7 +677,7 @@ function notesDrawerHTML(item) {
     </div>
     <div class="nd-body">
       <textarea id="note" placeholder="A thought, a quote, a question…" rows="5" aria-label="Your notes">${esc(S.noteOf(item.id))}</textarea>
-      <div class="prompts" aria-label="Thinking prompts">${NOTE_PROMPTS.map(p => `<button type="button" data-prompt="${esc(p)}">${esc(p)}</button>`).join('')}</div>
+      <div class="prompts" aria-label="Thinking prompts">${promptsFor(item.id).map(p => `<button type="button" data-prompt="${esc(p)}">${esc(p)}</button>`).join('')}</div>
       <div class="nd-foot"><span class="saved-state" id="note-state"></span><span class="nd-tip">Select text in the piece to quote it</span></div>
     </div>
   </aside>
@@ -784,7 +841,7 @@ function mountNotes(root, item) {
 
   let nt;
   note.oninput = () => { clearTimeout(nt); state.textContent = 'Saving…'; nt = setTimeout(() => { persist(); state.textContent = 'Saved'; setTimeout(() => { if (state.textContent === 'Saved') state.textContent = ''; }, 1500); }, 500); };
-  $$('[data-prompt]', root).forEach(b => b.onclick = () => { append(b.dataset.prompt + '\n'); });
+  $$('[data-prompt]', root).forEach(b => b.onclick = () => { haptic(); append(`**${b.dataset.prompt}**\n\n`); });
   const append = (text) => { note.value = (note.value.trim() ? note.value.replace(/\s*$/, '\n\n') : '') + text; note.focus({ preventScroll: true }); note.setSelectionRange(note.value.length, note.value.length); note.scrollTop = note.scrollHeight; note.dispatchEvent(new Event('input')); };
 
   // Quote a selection from the piece into the notes.
@@ -800,7 +857,14 @@ function mountNotes(root, item) {
     quoteBtn.style.top = `${Math.max(8, r.top - 44)}px`;
   }, 120); };
   document.addEventListener('selectionchange', onSel);
-  quoteBtn.onclick = () => { const text = document.getSelection().toString().trim().replace(/\s+/g, ' '); if (!text) return; quoteBtn.hidden = true; document.getSelection().removeAllRanges(); setMode('open'); append(`“${text}”\n`); haptic(); };
+  quoteBtn.onclick = () => {
+    const text = document.getSelection().toString().trim().replace(/\s+/g, ' ');
+    if (!text) return;
+    quoteBtn.hidden = true; document.getSelection().removeAllRanges(); setMode('open');
+    // Markdown blockquote: the passage, then room to answer it. Notes export
+    // as .md, so this is the same shape on the page and in the file.
+    append(`> ${text}\n\n`); haptic();
+  };
   window.addEventListener('scroll', () => { if (!quoteBtn.hidden) quoteBtn.hidden = true; }, { passive: true });
 
   // Keep the drawer above the on-screen keyboard (iOS keeps fixed elements behind it otherwise).

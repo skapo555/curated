@@ -707,3 +707,16 @@ body.welcoming .tabbar, body.welcoming .page-head { display: none; }
   display: flex; flex-direction: column; align-items: center; gap: 10px; }
 .btn.lg { width: 100%; padding: 14px 20px; font-size: 15px; }
 .btn.lg[disabled] { opacity: .45; pointer-events: none; }
+
+/* ---- Notes as thinking, not as a text field ---- */
+.note-body blockquote, .note-preview blockquote {
+  margin: 0 0 10px; padding: 2px 0 2px 14px; border-left: 2px solid var(--accent);
+  font-family: var(--serif); font-size: 15px; line-height: 1.5; color: var(--ink-2); font-style: italic;
+}
+.note-body .note-q, .note-preview .note-q {
+  margin: 14px 0 6px; font-family: var(--sans); font-size: 12px; font-weight: 600;
+  letter-spacing: .04em; text-transform: uppercase; color: var(--ink-3);
+}
+.note-body .note-q:first-child, .note-preview .note-q:first-child { margin-top: 0; }
+.note-body p, .note-preview p { margin: 0 0 10px; font-size: 15px; line-height: 1.6; }
+.note-body > :last-child, .note-preview p:last-of-type { margin-bottom: 0; }

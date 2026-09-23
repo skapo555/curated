@@ -18,6 +18,11 @@ export const TOPICS = [
 export const SOURCES = [];
 export const ITEMS = [];
 
+/* Things built but not currently shown. In the Know works and is reachable at
+   #/know; it is off the nav while Curated is only about long-form reading.
+   Flip to true to bring it back — nothing else needs changing. */
+export const FEATURES = { inTheKnow: false };
+
 /* Where a source looks, not where it is published from. The Sources screen
    groups by this so the shape of your reading is visible at a glance. */
 export const REGIONS = [

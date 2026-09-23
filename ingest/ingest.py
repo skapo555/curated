@@ -130,6 +130,7 @@ def parse_feed(xml_bytes):
                 "author": text(it, "dc:creator") or text(it, "author"),
                 "published": parse_date(text(it, "pubDate") or text(it, "dc:date")),
                 "image": img, "yt_id": "",
+                "categories": [(c.text or "").strip() for c in it.findall("category") if c.text],
             }
 
 class Budget:
@@ -457,6 +458,26 @@ ROLLING = re.compile(
     r"|^\w+ (wrap|blog)\s*:",
     re.I)
 
+def passes_source_rules(src, item, entry):
+    """A general-news source is welcome, but only for the pieces that argue
+    something. Length alone can't tell a 7-minute obituary from a 7-minute
+    essay, so news sources also declare the desk sections they don't belong in.
+
+    Sources we can only see the headline of (paywalled) are exempt: we have no
+    body to measure, and they are usually the longest-form publications of all.
+    """
+    if src.get("metadataOnly"):
+        return True
+    lo = src.get("minMinutes")
+    if lo and item.get("readMinutes", 0) < lo:
+        return False
+    bad = src.get("excludeCategories")
+    if bad:
+        cats = {c.lower() for c in (entry.get("categories") or [])}
+        if cats & {b.lower() for b in bad}:
+            return False
+    return True
+
 def worth_for(source, item):
     """How substantial a piece is.
 
@@ -600,6 +621,9 @@ def main():
             except Exception as ex:      # a single flaky page must not end the run
                 log("   ! skipped:", title[:60], ex); continue
             item["worth"] = worth_for(src, item)
+            if not passes_source_rules(src, item, e):
+                log(f"   - {title[:60]} (outside this source's remit)")
+                continue
             with open(item_file, "w") as f: json.dump(detail, f, ensure_ascii=False)
             items.append(item); count += 1
             if count >= MAX_PER_SOURCE: break
