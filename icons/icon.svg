@@ -1,8 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- The "c" is the Fraunces Black outline converted to a path, so the mark
+       renders identically everywhere — favicons never load webfonts. -->
   <rect width="512" height="512" rx="112" fill="#f6f4ef"/>
-  <!-- Placement is measured, not eyeballed: the ink of the "c" sits 73.9 above
-       its baseline at this size, so a baseline of 330 puts the "c." unit's ink
-       centre on 256 in both axes. -->
-  <text x="221" y="330" text-anchor="middle" font-family="Fraunces, 'Cooper Black', Clarendon, Georgia, serif" font-size="330" font-weight="900" fill="#1c1b19">c</text>
-  <circle cx="341" cy="308" r="22" fill="#8a3b2c"/>
+  <g transform="translate(144.36 329.92) scale(0.16500 -0.16500)">
+    <path fill="#1c1b19" d="M894 637Q894 553 843.5 506.0Q793 459 710 459Q625 459 583.5 505.5Q542 552 542 625V654Q542 692 526.0 711.0Q510 730 478 730Q446 730 419.5 711.0Q393 692 377.5 653.0Q362 614 362 554Q362 458 395.5 394.0Q429 330 485.5 298.5Q542 267 611 267Q670 267 710.5 279.0Q751 291 789 322Q817 345 831.5 351.0Q846 357 859 357Q876 357 887.5 343.0Q899 329 899 297Q899 212 849.0 140.0Q799 68 707.5 24.0Q616 -20 492 -20Q362 -20 257.0 36.0Q152 92 91.0 195.0Q30 298 30 439Q30 573 88.5 681.0Q147 789 255.0 852.5Q363 916 510 916Q629 916 715.0 878.0Q801 840 847.5 776.5Q894 713 894 637Z"/>
+  </g>
+  <circle cx="340.69" cy="311.22" r="22.0" fill="#8a3b2c"/>
 </svg>

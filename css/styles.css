@@ -633,17 +633,25 @@ select.native { position: absolute; inset: 0; opacity: 0; width: 100%; height: 1
 .section-note { font-size: 12.5px; color: var(--ink-3); }
 
 /* ---------- In the Know ---------- */
-.brief { display: flex; flex-direction: column; }
-.brief-row { display: grid; grid-template-columns: auto 1fr auto; align-items: baseline; gap: 10px;
-  padding: 11px 0; border-bottom: 1px solid var(--line); }
-.brief-row:last-child { border-bottom: 0; }
-.brief-src { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
-  color: var(--ink-3); white-space: nowrap; }
-.brief-title { font-family: var(--serif); font-size: 16.5px; line-height: 1.3; }
-.brief-when { font-size: 11.5px; color: var(--ink-3); white-space: nowrap; }
-.brief-row:hover .brief-title { color: var(--accent); }
-@media (max-width: 739px) {
-  .brief-row { grid-template-columns: 1fr auto; }
-  .brief-src { grid-column: 1 / -1; margin-bottom: -6px; }
+/* A timeline: dense, chronological, quick to scan — but set in the same
+   type as everything else, so it reads as part of the same publication. */
+.know { display: flex; flex-direction: column; }
+.know-row { display: grid; grid-template-columns: 38px 1fr; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--line); }
+.know-row:last-child { border-bottom: 0; }
+.know-mark { width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center;
+  font-family: var(--serif); font-size: 17px; font-weight: 600; color: #fff; background: var(--tone);
+  line-height: 1; padding-top: .18em; }
+.know-mark.yt { border-radius: 50%; }
+.know-body { min-width: 0; display: block; }
+.know-head { display: flex; align-items: baseline; gap: 8px; }
+.know-head b { font-size: 13.5px; font-weight: 600; color: var(--ink); }
+.know-when { font-size: 12px; color: var(--ink-3); }
+.know-title { display: block; font-family: var(--serif); font-size: 17px; line-height: 1.32; margin-top: 2px; }
+.know-dek { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  font-size: 14px; line-height: 1.4; color: var(--ink-2); margin-top: 4px; }
+.know-row:hover .know-title { color: var(--accent); }
+@media (min-width: 1024px) {
+  .know { max-width: 640px; }
+  .know-row { grid-template-columns: 44px 1fr; gap: 14px; }
+  .know-mark { width: 44px; height: 44px; font-size: 19px; }
 }
-@media (min-width: 1024px) { .brief { columns: 2; column-gap: 44px; } .brief-row { break-inside: avoid; } }

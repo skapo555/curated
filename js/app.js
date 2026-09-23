@@ -61,6 +61,7 @@ const I = {
   type: '<svg viewBox="0 0 24 24"><path d="M4 18L8.5 6l4.5 12M5.6 14h5.8"/><path d="M15 18l2.6-7 2.6 7M15.9 15.6h3.4"/></svg>',
   notebook: '<svg viewBox="0 0 24 24"><path d="M7 4.5h11v15H7z"/><path d="M7 4.5a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2"/><path d="M10 9h5M10 12.5h5"/></svg>',
   browse: '<svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>',
+  pulse: '<svg viewBox="0 0 24 24"><path d="M3 12h4l2.5-6 4 13 2.5-7h5"/></svg>',
   refresh: '<svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v5h-5"/></svg>',
   chevDown: '<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>',
   chevUp: '<svg viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/></svg>',
@@ -120,13 +121,14 @@ document.addEventListener('error', (e) => {
 /* ============================================================ nav */
 const NAV_MAIN = [
   { id: 'today', href: '#/', label: 'Today', icon: I.today },
+  { id: 'know', href: '#/know', label: 'In the Know', icon: I.pulse },
   { id: 'new', href: '#/new', label: 'All New', icon: I.browse },
-  { id: 'topics', href: '#/topics', label: 'Topics', icon: I.topics },
   { id: 'saved', href: '#/saved', label: 'Saved', icon: I.saved },
   { id: 'sources', href: '#/sources', label: 'Sources', icon: I.sources },
 ];
 const NAV_MORE = [
   { id: 'notes', href: '#/notes', label: 'Notebook', icon: I.notebook },
+  { id: 'topics', href: '#/topics', label: 'Topics', icon: I.topics },
   { id: 'reading', href: '#/reading', label: 'Currently Reading', icon: I.reading },
   { id: 'archive', href: '#/archive', label: 'Archive', icon: I.archive },
   { id: 'settings', href: '#/settings', label: 'Settings', icon: I.settings },
@@ -163,14 +165,23 @@ function pickCard({ item, reason }, n) {
   return `<a class="pick pick-split" href="#/item/${item.id}"><div><span class="n">${n}.</span>${meta}<h3>${esc(item.title)}</h3><p class="dek">${esc(item.dek)}</p><span class="reason">${esc(reason)}</span></div>${imgHTML(item, 'r-1x1', 400, 400, isVideo ? `<span class="dur">${fmtDur(item.durationSec)}</span>` : '')}</a>`;
 }
 
-/* Deliberately plain: no image, no standfirst — a line you scan, not a card. */
-function briefRow(item) {
-  return `<a class="brief-row" href="#/item/${item.id}">
-    <span class="brief-src">${esc(srcName(item))}</span>
-    <span class="brief-title">${esc(item.title)}</span>
-    <span class="brief-when">${relTime(item.publishedAt)}</span>
+/* A timeline rather than a grid of cards: source, what happened, how long ago.
+   Scannable in a few seconds, and dense enough to keep reading. */
+function knowRow(item) {
+  const { tone } = imageFor({ img: item.sourceId });
+  const src_ = src(item);
+  return `<a class="know-row" href="#/item/${item.id}">
+    <span class="know-mark ${src_ && src_.type === 'youtube' ? 'yt' : ''}" style="--tone:${tone}" aria-hidden="true">${esc(srcName(item)[0])}</span>
+    <span class="know-body">
+      <span class="know-head"><b>${esc(srcName(item))}</b><span class="know-when">${relTime(item.publishedAt)}</span></span>
+      <span class="know-title">${esc(item.title)}</span>
+      ${item.dek ? `<span class="know-dek">${esc(item.dek)}</span>` : ''}
+    </span>
   </a>`;
 }
+
+/* Home shows the first few; the rest live in their own section. */
+function briefRow(item) { return knowRow(item); }
 
 function listRow(item, opts = {}) {
   const p = S.progressOf(item.id); const done = S.isCompleted(item.id);
@@ -202,7 +213,8 @@ screens.home = () => {
   S.recordSurfaced(picks.map(p => p.item.id));
   const newCount = S.allNew().length;
   const todayCount = picks.filter(p => p.hours <= 24).length;
-  const brief = S.inTheKnow(6, picks.map(p => p.item.id));
+  const brief = S.inTheKnow(4, picks.map(p => p.item.id));
+  const briefTotal = S.inTheKnow(Infinity).length;
   const cont = reading.length ? `<section class="section" aria-labelledby="cr">
       <div class="section-head"><h2 class="kicker" id="cr">Continue ${reading[0].type === 'video' ? 'Watching' : 'Reading'}</h2>${reading.length > 1 ? '<a class="section-link" href="#/reading">All →</a>' : ''}</div>
       ${continueCard(reading[0])}
@@ -216,8 +228,8 @@ screens.home = () => {
   return `<header class="page-head"><div class="head-row"><a class="wordmark" href="#/" aria-label="Curated — Today">curated</a><span class="spacer"></span><a class="icon-btn" href="#/settings" aria-label="Settings">${I.settings}</a></div><div class="dateline">${todayLine()}</div></header>
     <div class="home-grid"><div>${cont}</div><div>${three}
     ${brief.length ? `<section class="section" aria-labelledby="itk">
-      <div class="section-head"><h2 class="kicker" id="itk">In the Know</h2><span class="section-note">Shorter pieces</span></div>
-      <div class="brief">${brief.map(briefRow).join('')}</div>
+      <div class="section-head"><h2 class="kicker" id="itk">In the Know</h2><a class="section-link" href="#/know">All ${briefTotal} →</a></div>
+      <div class="know">${brief.map(knowRow).join('')}</div>
     </section>` : ''}
     ${newCount > 0 ? `<div class="see-all"><a href="#/new">See all ${newCount} new →</a></div>` : ''}</div></div>`;
 };
@@ -268,6 +280,20 @@ screens.saved = () => {
   const items = S.savedItems();
   return pageHead('Saved', 'Set aside for when you have the time.') +
     `<div class="list grid">${items.length ? items.map(i => listRow(i)).join('') : '<div class="empty">Nothing saved yet.<small>Tap the bookmark on anything to keep it here.</small></div>'}</div>`;
+};
+
+screens.know = () => {
+  renderNav('know');
+  const items = S.inTheKnow(Infinity);
+  let out = '', lastDay = null;
+  for (const i of items) {
+    const day = dayLabel(i.publishedAt);
+    if (day !== lastDay) { out += `<div class="day-head">${day}</div>`; lastDay = day; }
+    out += knowRow(i);
+  }
+  return pageHead('In the Know', 'The shorter pieces, newest first. Everything here is a few minutes at most.') +
+    (items.length ? `<div class="know">${out}</div>`
+      : '<div class="empty">Nothing short and new right now.<small>Your longer reads are on Today.</small></div>');
 };
 
 screens.notes = () => {
@@ -821,7 +847,7 @@ function render() {
   if (name === 'item') mountReader(root, arg);
   if (backStack[backStack.length - 1] !== hash) backStack.push(hash);
   window.scrollTo({ top: 0, behavior: 'instant' }); // readers restore their own position after this
-  const titles = { home: 'Curated', new: 'All New', topics: 'Topics', topic: 'Topics', source: 'Sources', saved: 'Saved', sources: 'Sources', reading: 'Currently Reading', archive: 'Archive', settings: 'Settings', notes: 'Notebook', signin: 'Sign in' };
+  const titles = { home: 'Curated', new: 'All New', topics: 'Topics', topic: 'Topics', source: 'Sources', saved: 'Saved', sources: 'Sources', reading: 'Currently Reading', archive: 'Archive', settings: 'Settings', notes: 'Notebook', signin: 'Sign in', know: 'In the Know' };
   document.title = name === 'item' ? `${S.itemById(arg)?.title || 'Curated'} — Curated` : (titles[name] === 'Curated' ? 'Curated' : `${titles[name] || 'Curated'} — Curated`);
 }
 

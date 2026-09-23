@@ -297,16 +297,16 @@ export function worthYourTime(n = state.settings.pickCount || 3) {
 
 /* In the Know — the short pieces, kept out of the way of the long reads.
    News you'd want to have noticed, in a form you can scan in fifteen seconds. */
-export function inTheKnow(limit = 6, exclude = []) {
+export function inTheKnow(limit = Infinity, exclude = []) {
   const skip = new Set(exclude);
   const candidates = allNew()
     .filter(i => i.worth > 0 && i.worth < SUBSTANTIAL && !skip.has(i.id)
                  && !isCompleted(i.id) && !isStarted(i.id) && feedbackOf(i.id) !== 'down')
-    .filter(i => hoursOld(i) <= 36)
     .sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt));
 
   // Newest first, but no single newsroom may fill the brief: the busiest
   // source would otherwise take every line.
+  if (limit === Infinity) return candidates;   // the section itself: straight chronological
   const out = [], perSource = {};
   for (const cap of [1, 2, 99]) {
     for (const i of candidates) {

@@ -354,7 +354,10 @@ def worth_for(source, item):
         if not item.get("hasBody"):
             return 2                       # headlines-only, can still be worth a look
         m = item["readMinutes"]
-        return 5 if m >= 20 else 4 if m >= 12 else 3 if m >= 6 else 2 if m >= 3 else 1
+        # 4 minutes is about 900 words: a considered piece rather than a brief.
+        # Concision is not the opposite of substance — Lowy and ASPI argue a
+        # case in 900 words, and that belongs among the long reads.
+        return 5 if m >= 16 else 4 if m >= 9 else 3 if m >= 4 else 2 if m >= 2 else 1
     secs = item.get("durationSec", 0)
     return 5 if secs >= 45 * 60 else 4 if secs >= 25 * 60 else 3 if secs >= 12 * 60 else 2
 
