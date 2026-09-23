@@ -472,6 +472,28 @@ screens.welcome.mount = (root) => {
   $('#w-skip', root).onclick = () => done([]);
 };
 
+/* The door. Curated is private: nothing is readable until you're signed in.
+   screens.signin stays as it was for the settings route; this is what an
+   unauthenticated visitor sees instead of any screen at all. */
+screens.gate = () => {
+  document.body.classList.add('gated');
+  $('#tabbar').innerHTML = ''; $('#sidebar-nav').innerHTML = '';
+  return `<div class="welcome gate">
+    <header class="welcome-head">
+      <span class="wordmark">curated</span>
+      <h1>Decide less.<br>Read more.</h1>
+      <p>A calm, finite reader built around long-form writing and the sources you choose. It is private by invitation — enter your email and we’ll send a link. There is no password to choose or remember.</p>
+    </header>
+    <form id="signin-form" class="gate-form" novalidate>
+      <input id="signin-email" type="email" inputmode="email" autocomplete="email" autocapitalize="off" spellcheck="false" placeholder="you@example.com" aria-label="Email address">
+      <button class="btn primary lg" type="submit" id="signin-go">Send me a link</button>
+    </form>
+    <p class="signin-msg" id="signin-msg" role="status"></p>
+    <p class="hint">Signups are closed while Curated is being built. If your address isn’t on the list the link won’t arrive.</p>
+  </div>`;
+};
+screens.gate.mount = (root) => screens.signin.mount(root);
+
 screens.sources = () => {
   renderNav('sources');
   const q = sourceQuery.trim().toLowerCase();
@@ -974,6 +996,14 @@ function route() {
 
 function render() {
   let { name, arg, hash } = route();
+  // Nothing here is public. Everything else waits behind this.
+  if (!A.isSignedIn()) {
+    const root = $('#main');
+    root.innerHTML = screens.gate();
+    screens.gate.mount(root);
+    return;
+  }
+  document.body.classList.remove('gated');
   // Nothing is chosen for you: a device that hasn't picked its sources
   // sees the picker first, whatever it asked for.
   if (CONTENT.live && !S.isOnboarded() && name !== 'welcome') { name = 'welcome'; arg = null; }
@@ -1085,24 +1115,25 @@ function offlineScreen(retrying) {
   const b = $('#retry'); if (b) b.onclick = () => { offlineScreen(true); boot(); };
 }
 
+let watchingAuth = false;
 async function boot() {
   const cb = A.consumeCallback();
+  if (cb && !cb.ok) toast(cb.error);
+  window.removeEventListener('hashchange', render);
+  window.addEventListener('hashchange', render);
+  if (!watchingAuth) { watchingAuth = true; A.onAuthChange(() => boot()); }
+  if (!A.isSignedIn()) { render(); return; }
   const live = await Promise.race([loadContent(), new Promise(r => setTimeout(() => r(false), 12000))]);
   if (!live) { offlineScreen(false); return; }
   S.syncSources(true);
-  window.removeEventListener('hashchange', render);
-  window.addEventListener('hashchange', render);
   installPullToRefresh();
   render();
   if (cb && cb.ok) {
     toast('Signed in — bringing your reading together', true);
     await Sync.adoptLocalState();
     render();
-  } else if (cb && !cb.ok) {
-    toast(cb.error);
   }
   Sync.start();
-  A.onAuthChange(() => render());
   Sync.onSyncChange(() => { if (route().name === 'settings') render(); });
 }
 boot();

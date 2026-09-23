@@ -720,3 +720,20 @@ body.welcoming .tabbar, body.welcoming .page-head { display: none; }
 .note-body .note-q:first-child, .note-preview .note-q:first-child { margin-top: 0; }
 .note-body p, .note-preview p { margin: 0 0 10px; font-size: 15px; line-height: 1.6; }
 .note-body > :last-child, .note-preview p:last-of-type { margin-bottom: 0; }
+
+/* ---- The door ---- */
+body.gated .tabbar, body.gated .sidebar, body.gated .page-head { display: none; }
+body.gated #main { padding-bottom: 0; }
+.welcome.gate { max-width: 460px; display: flex; flex-direction: column; justify-content: center; min-height: 100dvh; padding-bottom: 60px; }
+.welcome.gate .welcome-head { padding-top: 0; }
+.welcome.gate h1 { font-size: 40px; line-height: 1.08; }
+.gate-form { display: flex; flex-direction: column; gap: 10px; margin-top: 26px; }
+.gate-form input {
+  width: 100%; padding: 13px 15px; font-family: var(--sans); font-size: 16px;
+  color: var(--ink); background: var(--surface);
+  border: 1px solid var(--line-strong); border-radius: var(--radius-sm); }
+.gate-form input:focus { outline: none; border-color: var(--accent); }
+.welcome.gate .signin-msg { margin: 14px 0 0; font-size: 14px; line-height: 1.5; }
+.welcome.gate .signin-msg.bad { color: var(--accent); }
+.welcome.gate .signin-msg.good { color: var(--success); }
+.welcome.gate .hint { margin-top: 20px; }
