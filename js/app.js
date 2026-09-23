@@ -163,6 +163,15 @@ function pickCard({ item, reason }, n) {
   return `<a class="pick pick-split" href="#/item/${item.id}"><div><span class="n">${n}.</span>${meta}<h3>${esc(item.title)}</h3><p class="dek">${esc(item.dek)}</p><span class="reason">${esc(reason)}</span></div>${imgHTML(item, 'r-1x1', 400, 400, isVideo ? `<span class="dur">${fmtDur(item.durationSec)}</span>` : '')}</a>`;
 }
 
+/* Deliberately plain: no image, no standfirst — a line you scan, not a card. */
+function briefRow(item) {
+  return `<a class="brief-row" href="#/item/${item.id}">
+    <span class="brief-src">${esc(srcName(item))}</span>
+    <span class="brief-title">${esc(item.title)}</span>
+    <span class="brief-when">${relTime(item.publishedAt)}</span>
+  </a>`;
+}
+
 function listRow(item, opts = {}) {
   const p = S.progressOf(item.id); const done = S.isCompleted(item.id);
   const state = done ? `<span class="state">${I.check.replace('<svg', '<svg style="width:14px;height:14px;stroke:var(--success);fill:none;stroke-width:2.4"')} Finished</span>`
@@ -193,6 +202,7 @@ screens.home = () => {
   S.recordSurfaced(picks.map(p => p.item.id));
   const newCount = S.allNew().length;
   const todayCount = picks.filter(p => p.hours <= 24).length;
+  const brief = S.inTheKnow(6, picks.map(p => p.item.id));
   const cont = reading.length ? `<section class="section" aria-labelledby="cr">
       <div class="section-head"><h2 class="kicker" id="cr">Continue ${reading[0].type === 'video' ? 'Watching' : 'Reading'}</h2>${reading.length > 1 ? '<a class="section-link" href="#/reading">All →</a>' : ''}</div>
       ${continueCard(reading[0])}
@@ -205,6 +215,10 @@ screens.home = () => {
     </section>` : `<section class="section"><div class="empty">Nothing new is waiting for you.<small>That's fine. ${reading.length ? 'Finish what you started, or ' : 'F'}ollow a source or two when you feel like it.</small></div></section>`;
   return `<header class="page-head"><div class="head-row"><a class="wordmark" href="#/" aria-label="Curated — Today">curated</a><span class="spacer"></span><a class="icon-btn" href="#/settings" aria-label="Settings">${I.settings}</a></div><div class="dateline">${todayLine()}</div></header>
     <div class="home-grid"><div>${cont}</div><div>${three}
+    ${brief.length ? `<section class="section" aria-labelledby="itk">
+      <div class="section-head"><h2 class="kicker" id="itk">In the Know</h2><span class="section-note">Shorter pieces</span></div>
+      <div class="brief">${brief.map(briefRow).join('')}</div>
+    </section>` : ''}
     ${newCount > 0 ? `<div class="see-all"><a href="#/new">See all ${newCount} new →</a></div>` : ''}</div></div>`;
 };
 

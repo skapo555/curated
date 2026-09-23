@@ -11,9 +11,9 @@
     "id": "conversation",
     "name": "The Conversation",
     "type": "website",
-    "tagline": "Academic experts writing for a general audience, Australian edition.",
-    "feed": "https://theconversation.com/au/articles.atom",
-    "home": "https://theconversation.com/au"
+    "tagline": "Academic experts on business and the economy, Australian edition.",
+    "feed": "https://theconversation.com/au/business/articles.atom",
+    "home": "https://theconversation.com/au/business"
   },
   {
     "id": "diplomat",
@@ -38,22 +38,6 @@
     "tagline": "ISEAS analysis on Southeast Asia, from Singapore.",
     "feed": "https://fulcrum.sg/feed/",
     "home": "https://fulcrum.sg"
-  },
-  {
-    "id": "wotr",
-    "name": "War on the Rocks",
-    "type": "website",
-    "tagline": "National security analysis and commentary.",
-    "feed": "https://warontherocks.com/feed/",
-    "home": "https://warontherocks.com"
-  },
-  {
-    "id": "grattan",
-    "name": "Grattan Institute",
-    "type": "research",
-    "tagline": "Independent Australian public policy research.",
-    "feed": "https://grattan.edu.au/feed/",
-    "home": "https://grattan.edu.au"
   },
   {
     "id": "insidestory",
@@ -113,5 +97,37 @@
     "feed": "https://eastasiaforum.org/feed/",
     "home": "https://eastasiaforum.org",
     "unavailable": "Site blocks automated readers (Cloudflare). Retry later."
+  },
+  {
+    "id": "frontline",
+    "name": "Frontline",
+    "type": "publication",
+    "tagline": "The Hindu's magazine — long-form reporting and analysis from India.",
+    "feed": "https://frontline.thehindu.com/feeder/default.rss",
+    "home": "https://frontline.thehindu.com"
+  },
+  {
+    "id": "newmandala",
+    "name": "New Mandala",
+    "type": "research",
+    "tagline": "ANU scholarship on Southeast Asian politics and society, at length.",
+    "feed": "https://www.newmandala.org/feed/",
+    "home": "https://www.newmandala.org"
+  },
+  {
+    "id": "devpolicy",
+    "name": "Devpolicy Blog",
+    "type": "research",
+    "tagline": "ANU's Development Policy Centre on the Pacific, PNG and aid.",
+    "feed": "https://devpolicy.org/feed/",
+    "home": "https://devpolicy.org"
+  },
+  {
+    "id": "sbsworld",
+    "name": "SBS World News",
+    "type": "publication",
+    "tagline": "International news with an Australian lens.",
+    "feed": "https://www.sbs.com.au/news/topic/world/feed",
+    "home": "https://www.sbs.com.au/news/topic/world"
   }
 ]

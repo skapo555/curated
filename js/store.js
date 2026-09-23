@@ -221,7 +221,8 @@ const hoursOld = (item) => (Date.now() - new Date(item.publishedAt).getTime()) /
    it reach back. Within a tier, quality and what you've shown a taste for
    decide. Anything Home already offered on a previous day steps aside for
    something you haven't seen. */
-const TIERS = [24, 48, 72, 24 * 7];
+/* A piece, rather than a news brief. Ingest scores 3 at roughly six minutes. */
+export const SUBSTANTIAL = 3;
 
 export function worthYourTime(n = state.settings.pickCount || 3) {
   const aff = affinities();
@@ -269,12 +270,14 @@ export function worthYourTime(n = state.settings.pickCount || 3) {
   // takes the substantial things from the last few days first, then today's
   // lighter pieces, then reaches further back. Each pass relaxes either the
   // quality floor or the window, never both at once.
+  // Only considered pieces reach Home. Short news has its own place now, so
+  // when a day is thin this reaches further back in time rather than lower in
+  // quality — which is the honest trade for a section called "worth your time".
   const PASSES = [
-    { floor: 3, hours: 24 }, { floor: 3, hours: 48 }, { floor: 3, hours: 72 },
-    { floor: 2, hours: 24 },
-    { floor: 3, hours: 24 * 7 },
-    { floor: 2, hours: 48 }, { floor: 2, hours: 24 * 7 },
-    { floor: 1, hours: 24 * 7 },
+    { floor: SUBSTANTIAL, hours: 24 }, { floor: SUBSTANTIAL, hours: 48 },
+    { floor: SUBSTANTIAL, hours: 72 }, { floor: SUBSTANTIAL, hours: 24 * 7 },
+    { floor: SUBSTANTIAL, hours: 24 * 14 },
+    { floor: 2, hours: 48 },          // only if a fortnight of reading is exhausted
   ];
   for (const pass of PASSES) {
     if (picks.length === n) break;
@@ -284,12 +287,37 @@ export function worthYourTime(n = state.settings.pickCount || 3) {
     take(tier, { strictTopic: true, capSource: true, capVideo: true });
     take(tier, { strictTopic: false, capSource: true, capVideo: true });
   }
-  // Last resort, if the source universe is small: anything left.
-  if (picks.length < n) {
+  // Last resort, if the source universe is very small: anything left.
+  if (picks.length < Math.min(n, 3)) {
     take(scored.slice().sort((a, b) => b.score - a.score), { strictTopic: false, capSource: false, capVideo: false });
   }
 
   return picks.map(c => ({ ...c, reason: reasonFor(c, aff) }));
+}
+
+/* In the Know — the short pieces, kept out of the way of the long reads.
+   News you'd want to have noticed, in a form you can scan in fifteen seconds. */
+export function inTheKnow(limit = 6, exclude = []) {
+  const skip = new Set(exclude);
+  const candidates = allNew()
+    .filter(i => i.worth > 0 && i.worth < SUBSTANTIAL && !skip.has(i.id)
+                 && !isCompleted(i.id) && !isStarted(i.id) && feedbackOf(i.id) !== 'down')
+    .filter(i => hoursOld(i) <= 36)
+    .sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt));
+
+  // Newest first, but no single newsroom may fill the brief: the busiest
+  // source would otherwise take every line.
+  const out = [], perSource = {};
+  for (const cap of [1, 2, 99]) {
+    for (const i of candidates) {
+      if (out.length === limit) return out;
+      if (out.includes(i)) continue;
+      if ((perSource[i.sourceId] || 0) >= cap) continue;
+      out.push(i);
+      perSource[i.sourceId] = (perSource[i.sourceId] || 0) + 1;
+    }
+  }
+  return out;
 }
 
 /* Called once Home has actually shown these, so tomorrow can offer something

@@ -631,3 +631,19 @@ select.native { position: absolute; inset: 0; opacity: 0; width: 100%; height: 1
 .signin .hint { margin-top: 26px; }
 .opt small { font-weight: 400; }
 .section-note { font-size: 12.5px; color: var(--ink-3); }
+
+/* ---------- In the Know ---------- */
+.brief { display: flex; flex-direction: column; }
+.brief-row { display: grid; grid-template-columns: auto 1fr auto; align-items: baseline; gap: 10px;
+  padding: 11px 0; border-bottom: 1px solid var(--line); }
+.brief-row:last-child { border-bottom: 0; }
+.brief-src { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--ink-3); white-space: nowrap; }
+.brief-title { font-family: var(--serif); font-size: 16.5px; line-height: 1.3; }
+.brief-when { font-size: 11.5px; color: var(--ink-3); white-space: nowrap; }
+.brief-row:hover .brief-title { color: var(--accent); }
+@media (max-width: 739px) {
+  .brief-row { grid-template-columns: 1fr auto; }
+  .brief-src { grid-column: 1 / -1; margin-bottom: -6px; }
+}
+@media (min-width: 1024px) { .brief { columns: 2; column-gap: 44px; } .brief-row { break-inside: avoid; } }
