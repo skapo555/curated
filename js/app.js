@@ -2,6 +2,8 @@
 
 import { ITEMS, SOURCES, TOPICS, SOURCE_TYPE_LABEL, imageFor, CONTENT, loadContent, loadItemDetail } from './data.js';
 import * as S from './store.js';
+import * as A from './auth.js';
+import * as Sync from './sync.js';
 
 /* ============================================================ helpers */
 const $ = (sel, el = document) => el.querySelector(sel);
@@ -377,11 +379,66 @@ screens.sources.mount = (root) => {
   });
 };
 
+function accountGroup() {
+  const u = A.currentUser();
+  const st = Sync.syncState();
+  if (!A.isSignedIn()) {
+    return `<div class="group"><h2>Your account</h2>
+      <p class="desc">Curated works perfectly well without one — everything stays on this device. Sign in only if you want your reading to follow you to another device.</p>
+      <div class="options"><a class="opt link" href="#/signin"><span>Sign in<small>A link by email. No password.</small></span><span class="chev"></span></a></div></div>`;
+  }
+  const when = st.at ? relTime(new Date(st.at).toISOString()) : 'not yet';
+  const label = st.status === 'syncing' ? 'Syncing…'
+    : st.status === 'offline' ? 'Offline — will sync when you’re back'
+    : st.status === 'error' ? 'Sync had trouble — it will retry'
+    : `Last synced ${when}`;
+  return `<div class="group"><h2>Your account</h2>
+    <div class="options">
+      <div class="opt"><span>${esc(u ? u.email : '')}<small>${esc(label)}</small></span></div>
+      <button class="opt" id="sync-now"><span>Sync now</span></button>
+      <button class="opt" id="sign-out"><span>Sign out<small>Your reading stays on this device</small></span></button>
+      <button class="opt danger" id="delete-account"><span>Delete account<small>Removes everything stored on the server</small></span></button>
+    </div></div>`;
+}
+
+screens.signin = () => {
+  renderNav('');
+  const u = A.currentUser();
+  if (A.isSignedIn()) return screens.settings();
+  return pageHead('Sign in', '', '#/settings') +
+    `<div class="signin">
+      <p class="signin-lead">Enter your email and we’ll send you a link. There’s no password to choose or remember.</p>
+      <form id="signin-form" novalidate>
+        <input id="signin-email" type="email" inputmode="email" autocomplete="email" autocapitalize="off" spellcheck="false" placeholder="you@example.com" aria-label="Email address">
+        <button class="btn primary" type="submit" id="signin-go">Send me a link</button>
+      </form>
+      <p class="signin-msg" id="signin-msg" role="status"></p>
+      <p class="hint">Signing in syncs your progress, saves, follows and notes so they follow you between devices. Your notes are stored on a server you can delete at any time — they’re private to your account, but they’re no longer only on this phone.</p>
+    </div>`;
+};
+screens.signin.mount = (root) => {
+  const form = $('#signin-form', root), input = $('#signin-email', root), msg = $('#signin-msg', root), go = $('#signin-go', root);
+  input.focus();
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    const email = input.value.trim();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { msg.textContent = 'That doesn’t look like an email address.'; msg.className = 'signin-msg bad'; return; }
+    go.disabled = true; go.textContent = 'Sending…'; msg.textContent = ''; msg.className = 'signin-msg';
+    const r = await A.sendMagicLink(email);
+    go.disabled = false; go.textContent = 'Send me a link';
+    if (r.ok) {
+      msg.innerHTML = `Check <b>${esc(email)}</b> — the link will sign you in. It expires in an hour.`;
+      msg.className = 'signin-msg good';
+      form.hidden = true;
+    } else { msg.textContent = r.error; msg.className = 'signin-msg bad'; }
+  };
+};
+
 screens.settings = () => {
   renderNav('');
   const st = S.settings();
   const opt = (group, value, label, sub = '') => `<button class="opt" role="radio" data-set="${group}" data-val="${value}" aria-checked="${st[group] === value}"><span>${label}${sub ? `<small>${sub}</small>` : ''}</span><span class="check">${I.check}</span></button>`;
-  return pageHead('Settings', '', '#/') +
+  return pageHead('Settings', '', '#/') + accountGroup() +
     `<div class="group"><h2>Archive after</h2><p class="desc">New content leaves the active feed after this long. It isn’t deleted — it moves to Archive.</p><div class="options" role="radiogroup">${[3, 7, 14, 30].map(d => opt('archiveDays', d, `${d} days`, d === 7 ? 'Default' : '')).join('')}</div></div>
     <div class="group"><h2>When you reach the end</h2><p class="desc">What Curated does when you finish a piece.</p><div class="options" role="radiogroup">${opt('completion', 'auto', 'Mark as finished automatically', 'It leaves Currently Reading on its own')}${opt('completion', 'ask', 'Ask me', 'A quick “finished?” at the end')}${opt('completion', 'manual', 'I’ll mark it myself', 'Nothing happens until you say so')}</div></div>
     <div class="group"><h2>How many on Today</h2><p class="desc">Curated picks these from your sources. Fewer means less to weigh up; more means more to browse.</p><div class="options" role="radiogroup">${opt('pickCount', 3, 'Three', 'Decide less')}${opt('pickCount', 5, 'Five')}${opt('pickCount', 10, 'Ten', 'Default')}${opt('pickCount', 15, 'Fifteen')}</div></div>
@@ -398,6 +455,15 @@ screens.settings.mount = (root) => {
     const k = b.dataset.set; let v = b.dataset.val; if (k === 'archiveDays' || k === 'pickCount') v = Number(v);
     S.setSetting(k, v); applyPrefs(); haptic(); render();
   });
+  const sn = $('#sync-now', root);
+  if (sn) sn.onclick = async () => { toast('Syncing…'); const r = await Sync.sync(); toast(r.ok ? 'Up to date' : 'Couldn’t sync — will retry', r.ok); render(); };
+  const so = $('#sign-out', root);
+  if (so) so.onclick = () => sheet(`<h2>Sign out?</h2><p>Your reading stays on this device. Signing back in will bring everything together again.</p><div class="row-btns"><button class="btn ghost" id="s-no">Stay</button><button class="btn primary" id="s-yes">Sign out</button></div>`,
+    { '#s-no': () => {}, '#s-yes': async () => { await A.signOut(); toast('Signed out'); render(); } });
+  const da = $('#delete-account', root);
+  if (da) da.onclick = () => sheet(`<h2>Delete your account?</h2><p style="text-transform:none;letter-spacing:0;font-size:15px;color:var(--ink-2);font-weight:400">This permanently removes your progress, saves, follows and notes from the server, and cannot be undone. What's on this device stays until you clear it.</p><div class="row-btns"><button class="btn ghost" id="s-no">Keep it</button><button class="btn accent" id="s-yes">Delete</button></div>`,
+    { '#s-no': () => {}, '#s-yes': async () => { const ok = await A.deleteAccount(); toast(ok ? 'Account deleted' : 'Couldn’t delete — try again', ok); render(); } });
+
   $('#reset', root).onclick = () => sheet(`<h2>Start fresh?</h2><p>This clears everything you’ve read, saved, reacted to and written on this device.</p><div class="row-btns"><button class="btn ghost" id="s-no">Keep it</button><button class="btn accent" id="s-yes">Reset</button></div>`,
     { '#s-no': () => {}, '#s-yes': () => { S.resetAll(); applyPrefs(); toast('Reset. Fresh start.', true); location.hash = '#/'; } });
 };
@@ -739,7 +805,7 @@ function render() {
   if (name === 'item') mountReader(root, arg);
   if (backStack[backStack.length - 1] !== hash) backStack.push(hash);
   window.scrollTo({ top: 0, behavior: 'instant' }); // readers restore their own position after this
-  const titles = { home: 'Curated', new: 'All New', topics: 'Topics', topic: 'Topics', source: 'Sources', saved: 'Saved', sources: 'Sources', reading: 'Currently Reading', archive: 'Archive', settings: 'Settings', notes: 'Notebook' };
+  const titles = { home: 'Curated', new: 'All New', topics: 'Topics', topic: 'Topics', source: 'Sources', saved: 'Saved', sources: 'Sources', reading: 'Currently Reading', archive: 'Archive', settings: 'Settings', notes: 'Notebook', signin: 'Sign in' };
   document.title = name === 'item' ? `${S.itemById(arg)?.title || 'Curated'} — Curated` : (titles[name] === 'Curated' ? 'Curated' : `${titles[name] || 'Curated'} — Curated`);
 }
 
@@ -827,6 +893,7 @@ function offlineScreen(retrying) {
 }
 
 async function boot() {
+  const cb = A.consumeCallback();
   const live = await Promise.race([loadContent(), new Promise(r => setTimeout(() => r(false), 12000))]);
   if (!live) { offlineScreen(false); return; }
   S.syncSources(true);
@@ -834,6 +901,16 @@ async function boot() {
   window.addEventListener('hashchange', render);
   installPullToRefresh();
   render();
+  if (cb && cb.ok) {
+    toast('Signed in — bringing your reading together', true);
+    await Sync.adoptLocalState();
+    render();
+  } else if (cb && !cb.ok) {
+    toast(cb.error);
+  }
+  Sync.start();
+  A.onAuthChange(() => render());
+  Sync.onSyncChange(() => { if (route().name === 'settings') render(); });
 }
 boot();
 

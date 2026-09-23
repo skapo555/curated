@@ -7,6 +7,8 @@ html = (root / 'index.html').read_text()
 css = (root / 'css/styles.css').read_text()
 data = (root / 'js/data.js').read_text()
 store = (root / 'js/store.js').read_text()
+auth = (root / 'js/auth.js').read_text()
+sync = (root / 'js/sync.js').read_text()
 app = (root / 'js/app.js').read_text()
 
 def strip_modules(src):
@@ -20,7 +22,12 @@ store_js = strip_modules(store) + "\nconst S = { " + ", ".join(exports) + " };\n
 data_js = strip_modules(data)
 app_js = strip_modules(app)
 
-js = "(() => {\n'use strict';\n" + data_js + "\n" + store_js + "\n" + app_js + "\n})();"
+auth_exports = re.findall(r"^export (?:const|function|let|async function) (\w+)", auth, flags=re.M)
+sync_exports = re.findall(r"^export (?:const|function|let|async function) (\w+)", sync, flags=re.M)
+auth_js = strip_modules(auth).replace("export async function", "async function") + "\nconst A = { " + ", ".join(auth_exports) + " };\n"
+sync_js = strip_modules(sync).replace("export async function", "async function") + "\nconst Sync = { " + ", ".join(sync_exports) + " };\n"
+
+js = "(() => {\n'use strict';\n" + data_js + "\n" + store_js + "\n" + auth_js + "\n" + sync_js + "\n" + app_js + "\n})();"
 
 icon = base64.b64encode((root / 'icons/icon-180.png').read_bytes()).decode()
 svg = base64.b64encode((root / 'icons/icon.svg').read_bytes()).decode()
