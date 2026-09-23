@@ -5,8 +5,7 @@
     "type": "research",
     "tagline": "Lowy Institute analysis on Australia in the world.",
     "feed": "https://www.lowyinstitute.org/the-interpreter/rss.xml",
-    "home": "https://www.lowyinstitute.org/the-interpreter",
-    "weight": 1
+    "home": "https://www.lowyinstitute.org/the-interpreter"
   },
   {
     "id": "conversation",
@@ -14,8 +13,7 @@
     "type": "website",
     "tagline": "Academic experts writing for a general audience, Australian edition.",
     "feed": "https://theconversation.com/au/articles.atom",
-    "home": "https://theconversation.com/au",
-    "weight": 0
+    "home": "https://theconversation.com/au"
   },
   {
     "id": "diplomat",
@@ -23,8 +21,7 @@
     "type": "publication",
     "tagline": "Asia-Pacific current affairs.",
     "feed": "https://thediplomat.com/feed/",
-    "home": "https://thediplomat.com",
-    "weight": 0
+    "home": "https://thediplomat.com"
   },
   {
     "id": "strategist",
@@ -32,8 +29,7 @@
     "type": "research",
     "tagline": "ASPI’s commentary on defence and security.",
     "feed": "https://www.aspistrategist.org.au/feed/",
-    "home": "https://www.aspistrategist.org.au",
-    "weight": 1
+    "home": "https://www.aspistrategist.org.au"
   },
   {
     "id": "fulcrum",
@@ -41,8 +37,7 @@
     "type": "research",
     "tagline": "ISEAS analysis on Southeast Asia, from Singapore.",
     "feed": "https://fulcrum.sg/feed/",
-    "home": "https://fulcrum.sg",
-    "weight": 1
+    "home": "https://fulcrum.sg"
   },
   {
     "id": "wotr",
@@ -50,8 +45,7 @@
     "type": "website",
     "tagline": "National security analysis and commentary.",
     "feed": "https://warontherocks.com/feed/",
-    "home": "https://warontherocks.com",
-    "weight": 1
+    "home": "https://warontherocks.com"
   },
   {
     "id": "grattan",
@@ -59,8 +53,7 @@
     "type": "research",
     "tagline": "Independent Australian public policy research.",
     "feed": "https://grattan.edu.au/feed/",
-    "home": "https://grattan.edu.au",
-    "weight": 1
+    "home": "https://grattan.edu.au"
   },
   {
     "id": "insidestory",
@@ -68,8 +61,7 @@
     "type": "publication",
     "tagline": "Current affairs and culture from Australia, at length.",
     "feed": "https://insidestory.org.au/feed/",
-    "home": "https://insidestory.org.au",
-    "weight": 1
+    "home": "https://insidestory.org.au"
   },
   {
     "id": "abc",
@@ -77,8 +69,7 @@
     "type": "publication",
     "tagline": "Australia’s public broadcaster — top stories.",
     "feed": "https://www.abc.net.au/news/feed/45910/rss.xml",
-    "home": "https://www.abc.net.au/news",
-    "weight": 0
+    "home": "https://www.abc.net.au/news"
   },
   {
     "id": "caspian",
@@ -86,8 +77,7 @@
     "type": "youtube",
     "tagline": "Geopolitics explained through history and geography.",
     "feed": "https://www.youtube.com/feeds/videos.xml?channel_id=UCwnKziETDbHJtx78nIkfYug",
-    "home": "https://www.youtube.com/@CaspianReport",
-    "weight": 1
+    "home": "https://www.youtube.com/@CaspianReport"
   },
   {
     "id": "perun",
@@ -95,8 +85,7 @@
     "type": "youtube",
     "tagline": "Long-form defence economics, one PowerPoint at a time.",
     "feed": "https://www.youtube.com/feeds/videos.xml?channel_id=UCC3ehuUksTyQ7bbjGntmx3Q",
-    "home": "https://www.youtube.com/@PerunAU",
-    "weight": 1
+    "home": "https://www.youtube.com/@PerunAU"
   },
   {
     "id": "foreignaffairs",
@@ -105,7 +94,6 @@
     "tagline": "Essays on international relations and grand strategy. Paywalled — headlines here, read on the site.",
     "feed": "https://www.foreignaffairs.com/rss.xml",
     "home": "https://www.foreignaffairs.com",
-    "weight": 1,
     "metadataOnly": true
   },
   {
@@ -115,7 +103,6 @@
     "tagline": "Australian politics, society and culture. Paywalled — headlines here, read on the site.",
     "feed": "https://www.themonthly.com.au/feed.xml",
     "home": "https://www.themonthly.com.au",
-    "weight": 1,
     "metadataOnly": true
   },
   {
@@ -125,7 +112,6 @@
     "tagline": "ANU’s forum on economics and policy across Asia.",
     "feed": "https://eastasiaforum.org/feed/",
     "home": "https://eastasiaforum.org",
-    "weight": 1,
     "unavailable": "Site blocks automated readers (Cloudflare). Retry later."
   }
 ]

@@ -2,7 +2,7 @@
    The shell is network-first so a published update is picked up on the next
    load; content under data/ is always network (never served stale), and the
    cache is only a fallback for going offline. */
-const CACHE = 'curated-v17';
+const CACHE = 'curated-v18';
 const SHELL = ['./', './index.html', './css/styles.css', './js/app.js', './js/store.js', './js/data.js', './js/auth.js', './js/sync.js', './manifest.webmanifest', './icons/icon.svg'];
 
 self.addEventListener('install', (e) => {

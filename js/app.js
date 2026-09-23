@@ -190,7 +190,9 @@ screens.home = () => {
   renderNav('today');
   const reading = S.currentlyReading();
   const picks = S.worthYourTime();
+  S.recordSurfaced(picks.map(p => p.item.id));
   const newCount = S.allNew().length;
+  const todayCount = picks.filter(p => p.hours <= 24).length;
   const cont = reading.length ? `<section class="section" aria-labelledby="cr">
       <div class="section-head"><h2 class="kicker" id="cr">Continue ${reading[0].type === 'video' ? 'Watching' : 'Reading'}</h2>${reading.length > 1 ? '<a class="section-link" href="#/reading">All →</a>' : ''}</div>
       ${continueCard(reading[0])}
@@ -198,7 +200,7 @@ screens.home = () => {
     </section>` : '';
   const heading = picks.length >= 3 ? `${picks.length} Worth Your Time` : picks.length === 2 ? 'Two Worth Your Time' : 'One Worth Your Time';
   const three = picks.length ? `<section class="section" aria-labelledby="tw">
-      <div class="section-head"><h2 class="kicker" id="tw">${heading}</h2><a class="section-link" href="#/settings">Show fewer →</a></div>
+      <div class="section-head"><h2 class="kicker" id="tw">${heading}</h2>${todayCount < picks.length ? `<span class="section-note">${todayCount} from today</span>` : ''}</div>
       <div class="picks">${picks.map((p, i) => pickCard(p, i + 1)).join('')}</div>
     </section>` : `<section class="section"><div class="empty">Nothing new is waiting for you.<small>That's fine. ${reading.length ? 'Finish what you started, or ' : 'F'}ollow a source or two when you feel like it.</small></div></section>`;
   return `<header class="page-head"><div class="head-row"><a class="wordmark" href="#/" aria-label="Curated — Today">curated</a><span class="spacer"></span><a class="icon-btn" href="#/settings" aria-label="Settings">${I.settings}</a></div><div class="dateline">${todayLine()}</div></header>

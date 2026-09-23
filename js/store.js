@@ -27,6 +27,7 @@ const DEFAULTS = () => ({
     pickCount: 10,        // how many Home surfaces at once
   },
   liveSynced: false,
+  surfaced: {},         // itemId -> day it was first shown on Home
   at: { items: {}, followed: {}, notes: {}, settings: {} },
   syncedAt: 0,          // server time of the last successful pull
 });
@@ -211,57 +212,115 @@ function jitter(id) {
   return (n % 1000) / 1000 * 0.6;
 }
 
+const DAY_MS = 86400 * 1000;
+const dayKey = (d = new Date()) => `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+const hoursOld = (item) => (Date.now() - new Date(item.publishedAt).getTime()) / 3600000;
+
+/* Home is meant to answer "what today is worth your time", so recency is a
+   tier, not a tie-breaker: today's pieces are chosen first and only then does
+   it reach back. Within a tier, quality and what you've shown a taste for
+   decide. Anything Home already offered on a previous day steps aside for
+   something you haven't seen. */
+const TIERS = [24, 48, 72, 24 * 7];
+
 export function worthYourTime(n = state.settings.pickCount || 3) {
   const aff = affinities();
-  const pool = allNew().filter(i => !isStarted(i.id) && !isSaved(i.id) && feedbackOf(i.id) !== 'down');
+  const today = dayKey();
+  // worth 0 is rolling coverage — never a "piece worth your time".
+  const pool = allNew().filter(i => i.worth > 0 && !isStarted(i.id) && !isSaved(i.id) && feedbackOf(i.id) !== 'down');
+
   const scored = pool.map(item => {
-    let score = item.worth * 2;
-    const days = ageDays(item);
-    score += Math.max(0, 2 - days * 0.3);
     let topicBoost = 0; item.topics.forEach(t => { topicBoost += aff.topic[t] || 0; });
     const sourceBoost = aff.source[item.sourceId] || 0;
-    score += topicBoost + sourceBoost + jitter(item.id);
-    return { item, score, topicBoost, sourceBoost };
-  }).sort((a, b) => b.score - a.score);
+    const seenBefore = state.surfaced[item.id] && state.surfaced[item.id] !== today;
+    return {
+      item,
+      hours: hoursOld(item),
+      // Offered before and passed over: step aside, but don't disappear — on a
+      // quiet day a good piece should still beat a thin new one.
+      score: item.worth + topicBoost + sourceBoost + jitter(item.id) - (seenBefore ? 2.5 : 0),
+      topicBoost, sourceBoost,
+    };
+  });
 
   const picks = [];
-  const usedSources = new Set(); const usedTopics = new Set(); let videos = 0;
+  const bySource = {};
+  const usedTopics = new Set();
+  let videos = 0;
   const maxVideos = Math.max(1, Math.round(n / 5));
   const maxPerSource = n <= 3 ? 1 : Math.max(1, Math.ceil(n / 6));
-  const bySource = {};
-  const tryPick = (strict) => {
-    for (const c of scored) {
-      if (picks.length === n) break;
+
+  const take = (candidates, { strictTopic, capSource, capVideo }) => {
+    for (const c of candidates) {
+      if (picks.length === n) return;
       if (picks.includes(c)) continue;
-      if ((bySource[c.item.sourceId] || 0) >= maxPerSource) continue;
-      if (c.item.type === 'video' && videos >= maxVideos) continue;
-      if (strict && c.item.topics.every(t => usedTopics.has(t))) continue;
+      if (capSource && (bySource[c.item.sourceId] || 0) >= maxPerSource) continue;
+      if (capVideo && c.item.type === 'video' && videos >= maxVideos) continue;
+      if (strictTopic && c.item.topics.length && c.item.topics.every(t => usedTopics.has(t))) continue;
       picks.push(c);
       bySource[c.item.sourceId] = (bySource[c.item.sourceId] || 0) + 1;
-      usedSources.add(c.item.sourceId);
       c.item.topics.forEach(t => usedTopics.add(t));
       if (c.item.type === 'video') videos++;
     }
   };
-  tryPick(true); tryPick(false);
-  // Absolute last resort: fill with anything left (e.g. tiny source universe).
-  for (const c of scored) { if (picks.length === n) break; if (!picks.includes(c)) picks.push(c); }
+
+  // A single day rarely holds ten substantial pieces — most days it holds
+  // fewer than ten — so rather than scrape the bottom of today's barrel, this
+  // takes the substantial things from the last few days first, then today's
+  // lighter pieces, then reaches further back. Each pass relaxes either the
+  // quality floor or the window, never both at once.
+  const PASSES = [
+    { floor: 3, hours: 24 }, { floor: 3, hours: 48 }, { floor: 3, hours: 72 },
+    { floor: 2, hours: 24 },
+    { floor: 3, hours: 24 * 7 },
+    { floor: 2, hours: 48 }, { floor: 2, hours: 24 * 7 },
+    { floor: 1, hours: 24 * 7 },
+  ];
+  for (const pass of PASSES) {
+    if (picks.length === n) break;
+    const tier = scored
+      .filter(c => c.hours <= pass.hours && c.item.worth >= pass.floor)
+      .sort((a, b) => b.score - a.score);
+    take(tier, { strictTopic: true, capSource: true, capVideo: true });
+    take(tier, { strictTopic: false, capSource: true, capVideo: true });
+  }
+  // Last resort, if the source universe is small: anything left.
+  if (picks.length < n) {
+    take(scored.slice().sort((a, b) => b.score - a.score), { strictTopic: false, capSource: false, capVideo: false });
+  }
 
   return picks.map(c => ({ ...c, reason: reasonFor(c, aff) }));
 }
 
-function reasonFor({ item, topicBoost, sourceBoost }, aff) {
+/* Called once Home has actually shown these, so tomorrow can offer something
+   else. Items shown today are not penalised until tomorrow. */
+export function recordSurfaced(ids) {
+  const today = dayKey();
+  let changed = false;
+  for (const id of ids) if (!state.surfaced[id]) { state.surfaced[id] = today; changed = true; }
+  // forget anything older than the freshness window; it can come round again
+  const cutoff = Date.now() - (state.settings.archiveDays + 7) * DAY_MS;
+  for (const [id, day] of Object.entries(state.surfaced)) {
+    const [y, m, d] = day.split('-').map(Number);
+    if (new Date(y, m - 1, d).getTime() < cutoff) { delete state.surfaced[id]; changed = true; }
+  }
+  if (changed) save();
+}
+
+function reasonFor({ item, hours, topicBoost, sourceBoost }, aff) {
   const src = sourceById(item.sourceId);
+  if (hours <= 14) return 'Published today';
+  if (hours <= 24) return 'Published in the last day';
   if (sourceBoost >= 1.5) return `You tend to finish ${src.name}`;
-  if (sourceBoost >= 1) return `You liked recent pieces from ${src.name}`;
   if (topicBoost >= 1.5) {
     const best = item.topics.slice().sort((a, b) => (aff.topic[b] || 0) - (aff.topic[a] || 0))[0];
-    return `More on ${topicById(best).name}, as you asked`;
+    const t = topicById(best);
+    if (t) return `More on ${t.name}, as you asked`;
   }
+  if (hours <= 48) return 'Yesterday';
   if (item.type === 'video') return `Video · ${Math.round(item.durationSec / 60)} min`;
   if (item.readMinutes >= 15) return `Long read · ${item.readMinutes} min`;
-  if (ageDays(item) < 0.35) return 'Published this morning';
-  return `Worth your time from ${src.name}`;
+  return `Still worth your time · ${Math.round(hours / 24)} days old`;
 }
 
 /* ---------- Mutations ---------- */

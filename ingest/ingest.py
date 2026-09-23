@@ -330,14 +330,33 @@ def topics_for(title, summary, body_text=""):
     keep.sort(key=lambda k: -scores[k])
     return keep[:3]
 
+# Rolling coverage rather than a piece to read: a live blog is never "worth
+# your time" in the sense this product means. This judges the *format*, not
+# the publication.
+ROLLING = re.compile(
+    r"^(live|breaking|update|updates)\s*:"        # "Live:", "Breaking:" — the colon matters,
+    r"|\bas it happened\b"                        # so "Breaking Down the Budget" is left alone
+    r"|\blive (blog|updates?|coverage)\b"
+    r"|^\w+ (wrap|blog)\s*:",
+    re.I)
+
 def worth_for(source, item):
-    w = 3 + int(source.get("weight", 0))
+    """How substantial a piece is.
+
+    Deliberately carries no opinion about which publications are worth more:
+    that judgement belongs to the reader, and reaches the ranking through what
+    they finish and give a thumbs up to. What it does judge is format — length,
+    and whether this is a piece at all or a rolling feed of updates.
+    """
+    if ROLLING.search(item["title"]):
+        return 0
     if item["type"] == "article":
-        if item["readMinutes"] >= 12: w += 1
-        if item["readMinutes"] <= 2: w -= 1
-    else:
-        if item.get("durationSec", 0) >= 20 * 60: w += 1
-    return max(1, min(5, w))
+        if not item.get("hasBody"):
+            return 2                       # headlines-only, can still be worth a look
+        m = item["readMinutes"]
+        return 5 if m >= 20 else 4 if m >= 12 else 3 if m >= 6 else 2 if m >= 3 else 1
+    secs = item.get("durationSec", 0)
+    return 5 if secs >= 45 * 60 else 4 if secs >= 25 * 60 else 3 if secs >= 12 * 60 else 2
 
 def norm(t):
     return re.sub(r"[^a-z0-9]+", " ", (t or "").lower()).strip()
