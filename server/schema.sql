@@ -70,6 +70,19 @@ begin
   end loop;
 end $$;
 
+-- ---------------------------------------------------------------- API access
+-- Grant the signed-in role exactly what it needs, and never grant the
+-- anonymous role anything: an unauthenticated visitor should not be able to
+-- reach these tables at all. Row-level security above then decides *which*
+-- rows a signed-in user may touch. Written explicitly so the project can keep
+-- Supabase's "automatically expose new tables" switch turned off.
+grant usage on schema public to authenticated;
+grant select, insert, update, delete on
+  public.profiles, public.follows, public.item_state, public.notes
+  to authenticated;
+
+revoke all on public.allowed_emails from anon, authenticated;  -- server-side only
+
 -- ---------------------------------------------------------------- housekeeping
 -- Keep updated_at honest; the sync merge relies on it.
 create or replace function public.touch_updated_at()
