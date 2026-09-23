@@ -306,7 +306,7 @@ export function inTheKnow(limit = Infinity, exclude = []) {
 
   // Newest first, but no single newsroom may fill the brief: the busiest
   // source would otherwise take every line.
-  if (limit === Infinity) return candidates;   // the section itself: straight chronological
+  if (limit === Infinity) return spaceOutSources(candidates);
   const out = [], perSource = {};
   for (const cap of [1, 2, 99]) {
     for (const i of candidates) {
@@ -316,6 +316,31 @@ export function inTheKnow(limit = Infinity, exclude = []) {
       out.push(i);
       perSource[i.sourceId] = (perSource[i.sourceId] || 0) + 1;
     }
+  }
+  return out;
+}
+
+/* Roughly chronological, but no newsroom may run more than twice in a row:
+   the busiest source otherwise fills the first screen and the feed reads as
+   one masthead repeating itself. An item is only ever moved later, never
+   earlier, so the sense of time holds. */
+function spaceOutSources(list, maxRun = 2) {
+  const out = [], held = [];
+  const pool = list.slice();
+  while (pool.length || held.length) {
+    const runSource = out.length >= maxRun
+      && out.slice(-maxRun).every(i => i.sourceId === out[out.length - 1].sourceId)
+      ? out[out.length - 1].sourceId : null;
+    // prefer something held back earlier, then the next that breaks the run
+    let next = held.findIndex(i => i.sourceId !== runSource);
+    if (next >= 0) { out.push(held.splice(next, 1)[0]); continue; }
+    next = pool.findIndex(i => i.sourceId !== runSource);
+    if (next === -1) {                       // nothing else left: let the run stand
+      out.push(...held.splice(0), ...pool.splice(0));
+      break;
+    }
+    held.push(...pool.splice(0, next));       // the ones we skipped come back soon
+    out.push(pool.shift());
   }
   return out;
 }

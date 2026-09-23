@@ -165,21 +165,28 @@ function pickCard({ item, reason }, n) {
   return `<a class="pick pick-split" href="#/item/${item.id}"><div><span class="n">${n}.</span>${meta}<h3>${esc(item.title)}</h3><p class="dek">${esc(item.dek)}</p><span class="reason">${esc(reason)}</span></div>${imgHTML(item, 'r-1x1', 400, 400, isVideo ? `<span class="dur">${fmtDur(item.durationSec)}</span>` : '')}</a>`;
 }
 
-/* A timeline rather than a grid of cards: source, what happened, how long ago.
-   Scannable in a few seconds, and dense enough to keep reading. */
-function knowRow(item) {
-  const { tone } = imageFor({ img: item.sourceId });
-  const src_ = src(item);
-  return `<a class="know-row" href="#/item/${item.id}">
-    <span class="know-mark ${src_ && src_.type === 'youtube' ? 'yt' : ''}" style="--tone:${tone}" aria-hidden="true">${esc(srcName(item)[0])}</span>
-    <span class="know-body">
-      <span class="know-head"><b>${esc(srcName(item))}</b><span class="know-when">${relTime(item.publishedAt)}</span></span>
-      <span class="know-title">${esc(item.title)}</span>
-      ${item.dek ? `<span class="know-dek">${esc(item.dek)}</span>` : ''}
+/* Short pieces need rhythm, not a wall of rows: each day opens with one
+   image-led item, and the rest follow as compact lines. Headline only — the
+   standfirst is what made this feel like a spreadsheet. */
+function knowLead(item) {
+  return `<a class="know-lead" href="#/item/${item.id}">
+    ${imgHTML(item, 'r-16x9', 900, 506, item.type === 'video' ? videoExtras(item) : '')}
+    <span class="know-text">
+      <span class="know-meta"><b>${esc(srcName(item))}</b><span>${relTime(item.publishedAt)}</span></span>
+      <span class="know-lead-title">${esc(item.title)}</span>
     </span>
   </a>`;
 }
 
+function knowRow(item) {
+  return `<a class="know-row" href="#/item/${item.id}">
+    <span class="know-text">
+      <span class="know-meta"><b>${esc(srcName(item))}</b><span>${relTime(item.publishedAt)}</span></span>
+      <span class="know-title">${esc(item.title)}</span>
+    </span>
+    ${imgHTML(item, 'r-1x1', 200, 200)}
+  </a>`;
+}
 
 function listRow(item, opts = {}) {
   const p = S.progressOf(item.id); const done = S.isCompleted(item.id);
@@ -277,11 +284,21 @@ screens.saved = () => {
 screens.know = () => {
   renderNav('know');
   const items = S.inTheKnow(Infinity);
-  let out = '', lastDay = null;
+  // Group by day, and let each day open with a piece that actually has a
+  // picture — a lead with an empty frame is worse than no lead at all.
+  const byDay = [];
   for (const i of items) {
     const day = dayLabel(i.publishedAt);
-    if (day !== lastDay) { out += `<div class="day-head">${day}</div>`; lastDay = day; }
-    out += knowRow(i);
+    if (!byDay.length || byDay[byDay.length - 1].day !== day) byDay.push({ day, items: [] });
+    byDay[byDay.length - 1].items.push(i);
+  }
+  let out = '';
+  for (const { day, items: dayItems } of byDay) {
+    const leadAt = dayItems.slice(0, 5).findIndex(i => i.image);
+    const lead = leadAt >= 0 ? dayItems[leadAt] : null;
+    out += `<div class="day-head">${day}</div>`;
+    if (lead) out += knowLead(lead);
+    out += dayItems.filter(i => i !== lead).map(knowRow).join('');
   }
   return pageHead('In the Know', 'The shorter pieces, newest first. Everything here is a few minutes at most.') +
     (items.length ? `<div class="know">${out}</div>`
