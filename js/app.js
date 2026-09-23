@@ -482,7 +482,7 @@ screens.gate = () => {
     <header class="welcome-head">
       <span class="wordmark">curated</span>
       <h1>Decide less.<br>Read more.</h1>
-      <p>Long pieces, from publications you picked. A few each day, then it stops.</p>
+      <p>Long pieces, from publications you picked.</p>
     </header>
     <form id="signin-form" class="gate-form" novalidate>
       <input id="signin-email" type="email" inputmode="email" autocomplete="email" autocapitalize="off" spellcheck="false" placeholder="you@example.com" aria-label="Email address">
