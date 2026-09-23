@@ -435,7 +435,7 @@ screens.welcome = () => {
     <header class="welcome-head">
       <span class="wordmark">curated</span>
       <h1>Who do you trust?</h1>
-      <p>Curated never draws from anywhere you haven’t chosen. Pick as few or as many as you like — you can change this whenever you want.</p>
+      <p>Nothing gets in here that you didn’t pick. Change your mind whenever.</p>
     </header>
     ${groups.map(g => `<section class="pick-group">
       <div class="region-head"><div><h2 class="kicker">${esc(g.name)}</h2><p class="region-blurb">${esc(g.blurb)}</p></div>
@@ -482,14 +482,14 @@ screens.gate = () => {
     <header class="welcome-head">
       <span class="wordmark">curated</span>
       <h1>Decide less.<br>Read more.</h1>
-      <p>A calm, finite reader built around long-form writing and the sources you choose. It is private by invitation — enter your email and we’ll send a link. There is no password to choose or remember.</p>
+      <p>Long pieces, from publications you picked. A few each day, then it stops.</p>
     </header>
     <form id="signin-form" class="gate-form" novalidate>
       <input id="signin-email" type="email" inputmode="email" autocomplete="email" autocapitalize="off" spellcheck="false" placeholder="you@example.com" aria-label="Email address">
       <button class="btn primary lg" type="submit" id="signin-go">Send me a link</button>
     </form>
     <p class="signin-msg" id="signin-msg" role="status"></p>
-    <p class="hint">Signups are closed while Curated is being built. If your address isn’t on the list the link won’t arrive.</p>
+    <p class="hint">Invite-only for now. If you’re not on the list, no link will arrive.</p>
   </div>`;
 };
 screens.gate.mount = (root) => screens.signin.mount(root);
@@ -687,7 +687,7 @@ function noteHTML(text) {
 function notePreviewHTML(note) {
   return note.trim()
     ? `<div class="note-preview">${noteHTML(note)}<button class="btn ghost sm" data-open-notes>Edit note</button></div>`
-    : `<div class="note-empty"><p>A thought, a quote, a question — while you read or once you’re done.</p><button class="btn ghost sm" data-open-notes>Add a note</button></div>`;
+    : `<div class="note-empty"><p>What do you make of it?</p><button class="btn ghost sm" data-open-notes>Add a note</button></div>`;
 }
 /* Floating notes drawer: bottom sheet on phones, side panel on desktop. */
 function notesDrawerHTML(item) {
@@ -698,7 +698,7 @@ function notesDrawerHTML(item) {
       <button class="icon-btn" id="nd-close" aria-label="Close notes">${I.close}</button>
     </div>
     <div class="nd-body">
-      <textarea id="note" placeholder="A thought, a quote, a question…" rows="5" aria-label="Your notes">${esc(S.noteOf(item.id))}</textarea>
+      <textarea id="note" placeholder="Start writing…" rows="5" aria-label="Your notes">${esc(S.noteOf(item.id))}</textarea>
       <div class="prompts" aria-label="Thinking prompts">${promptsFor(item.id).map(p => `<button type="button" data-prompt="${esc(p)}">${esc(p)}</button>`).join('')}</div>
       <div class="nd-foot"><span class="saved-state" id="note-state"></span><span class="nd-tip">Select text in the piece to quote it</span></div>
     </div>
