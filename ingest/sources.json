@@ -6,10 +6,7 @@
     "tagline": "Lowy Institute analysis on Australia in the world.",
     "feed": "https://www.lowyinstitute.org/the-interpreter/rss.xml",
     "home": "https://www.lowyinstitute.org/the-interpreter",
-    "weight": 1,
-    "topics": [
-      "geopolitics"
-    ]
+    "weight": 1
   },
   {
     "id": "conversation",
@@ -18,10 +15,7 @@
     "tagline": "Academic experts writing for a general audience, Australian edition.",
     "feed": "https://theconversation.com/au/articles.atom",
     "home": "https://theconversation.com/au",
-    "weight": 0,
-    "topics": [
-      "australia"
-    ]
+    "weight": 0
   },
   {
     "id": "diplomat",
@@ -30,10 +24,7 @@
     "tagline": "Asia-Pacific current affairs.",
     "feed": "https://thediplomat.com/feed/",
     "home": "https://thediplomat.com",
-    "weight": 0,
-    "topics": [
-      "geopolitics"
-    ]
+    "weight": 0
   },
   {
     "id": "strategist",
@@ -42,10 +33,7 @@
     "tagline": "ASPI’s commentary on defence and security.",
     "feed": "https://www.aspistrategist.org.au/feed/",
     "home": "https://www.aspistrategist.org.au",
-    "weight": 1,
-    "topics": [
-      "defence"
-    ]
+    "weight": 1
   },
   {
     "id": "fulcrum",
@@ -54,10 +42,7 @@
     "tagline": "ISEAS analysis on Southeast Asia, from Singapore.",
     "feed": "https://fulcrum.sg/feed/",
     "home": "https://fulcrum.sg",
-    "weight": 1,
-    "topics": [
-      "geopolitics"
-    ]
+    "weight": 1
   },
   {
     "id": "wotr",
@@ -66,10 +51,7 @@
     "tagline": "National security analysis and commentary.",
     "feed": "https://warontherocks.com/feed/",
     "home": "https://warontherocks.com",
-    "weight": 1,
-    "topics": [
-      "defence"
-    ]
+    "weight": 1
   },
   {
     "id": "grattan",
@@ -78,11 +60,7 @@
     "tagline": "Independent Australian public policy research.",
     "feed": "https://grattan.edu.au/feed/",
     "home": "https://grattan.edu.au",
-    "weight": 1,
-    "topics": [
-      "policy",
-      "australia"
-    ]
+    "weight": 1
   },
   {
     "id": "insidestory",
@@ -91,10 +69,7 @@
     "tagline": "Current affairs and culture from Australia, at length.",
     "feed": "https://insidestory.org.au/feed/",
     "home": "https://insidestory.org.au",
-    "weight": 1,
-    "topics": [
-      "australia"
-    ]
+    "weight": 1
   },
   {
     "id": "abc",
@@ -103,10 +78,7 @@
     "tagline": "Australia’s public broadcaster — top stories.",
     "feed": "https://www.abc.net.au/news/feed/45910/rss.xml",
     "home": "https://www.abc.net.au/news",
-    "weight": 0,
-    "topics": [
-      "australia"
-    ]
+    "weight": 0
   },
   {
     "id": "caspian",
@@ -115,10 +87,7 @@
     "tagline": "Geopolitics explained through history and geography.",
     "feed": "https://www.youtube.com/feeds/videos.xml?channel_id=UCwnKziETDbHJtx78nIkfYug",
     "home": "https://www.youtube.com/@CaspianReport",
-    "weight": 1,
-    "topics": [
-      "geopolitics"
-    ]
+    "weight": 1
   },
   {
     "id": "perun",
@@ -127,10 +96,7 @@
     "tagline": "Long-form defence economics, one PowerPoint at a time.",
     "feed": "https://www.youtube.com/feeds/videos.xml?channel_id=UCC3ehuUksTyQ7bbjGntmx3Q",
     "home": "https://www.youtube.com/@PerunAU",
-    "weight": 1,
-    "topics": [
-      "defence"
-    ]
+    "weight": 1
   },
   {
     "id": "foreignaffairs",
@@ -140,9 +106,6 @@
     "feed": "https://www.foreignaffairs.com/rss.xml",
     "home": "https://www.foreignaffairs.com",
     "weight": 1,
-    "topics": [
-      "geopolitics"
-    ],
     "metadataOnly": true
   },
   {
@@ -153,9 +116,6 @@
     "feed": "https://www.themonthly.com.au/feed.xml",
     "home": "https://www.themonthly.com.au",
     "weight": 1,
-    "topics": [
-      "australia"
-    ],
     "metadataOnly": true
   },
   {
@@ -166,10 +126,6 @@
     "feed": "https://eastasiaforum.org/feed/",
     "home": "https://eastasiaforum.org",
     "weight": 1,
-    "topics": [
-      "economics",
-      "geopolitics"
-    ],
     "unavailable": "Site blocks automated readers (Cloudflare). Retry later."
   }
 ]

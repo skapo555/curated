@@ -310,12 +310,25 @@ def video_details(yt_id):
     return int(m.group(1)) if m else 0
 
 # ---------------------------------------------------------------- scoring
-def topics_for(source, title, summary):
-    hay = (title + " " + summary).lower()
-    found = [t for t, rx in TOPIC_RULES.items() if re.search(rx, hay)]
-    for t in source.get("topics", []):
-        if t not in found: found.append(t)
-    return found[:4] or ["policy"]
+def topics_for(title, summary, body_text=""):
+    """Topics have to be earned by the content.
+
+    Weighted by where a term appears — a match in the headline counts for more
+    than one buried in the body — and a topic is kept only if it is at least a
+    third as strong as the strongest match. A source's usual beat is NOT
+    inherited: Inside Story's default of 'australia' is how a piece about a
+    Canadian judge ended up filed under Australia.
+    """
+    t, d, b = title.lower(), (summary or "").lower(), (body_text or "").lower()
+    scores = {}
+    for topic, rx in TOPIC_RULES.items():
+        score = 3 * len(re.findall(rx, t)) + 2 * len(re.findall(rx, d)) + min(len(re.findall(rx, b)), 4)
+        if score: scores[topic] = score
+    if not scores: return []
+    best = max(scores.values())
+    keep = [k for k, v in scores.items() if v >= max(2, best / 3)]
+    keep.sort(key=lambda k: -scores[k])
+    return keep[:3]
 
 def worth_for(source, item):
     w = 3 + int(source.get("weight", 0))
@@ -414,7 +427,7 @@ def main():
                         "id": iid, "type": "video", "sourceId": src["id"], "title": title,
                         "dek": (clean_description(desc).split(". ")[0] or title)[:220], "author": None,
                         "publishedAt": pub.isoformat(), "durationSec": dur,
-                        "topics": topics_for(src, title, desc), "image": e["image"], "url": e["url"], "youtubeId": e["yt_id"],
+                        "topics": topics_for(title, desc), "image": e["image"], "url": e["url"], "youtubeId": e["yt_id"],
                     }
                     log(f"   + video {title[:60]} ({dur}s)")
                 else:
@@ -432,7 +445,8 @@ def main():
                         "id": iid, "type": "article", "sourceId": src["id"], "title": title,
                         "dek": dek_from(e["summary"], blocks), "author": strip_html(e["author"])[:80] or None,
                         "publishedAt": pub.isoformat(), "readMinutes": max(1, round(words / 230)) if ok else 0,
-                        "topics": topics_for(src, title, e["summary"]), "image": image or e["image"], "url": e["url"],
+                        "topics": topics_for(title, e["summary"], " ".join(x["text"] for x in blocks[:4])),
+                    "image": image or e["image"], "url": e["url"],
                         "hasBody": ok,
                     }
                     detail = {"id": iid, "type": "article", "body": blocks if ok else []}

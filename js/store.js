@@ -164,6 +164,11 @@ export function savedItems() {
     .sort((a, b) => state.saved[b.id] - state.saved[a.id]);
 }
 
+export function itemsForSource(sourceId) {
+  return ITEMS.filter(i => i.sourceId === sourceId)
+    .sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt));
+}
+
 export function itemsForTopic(topicId) {
   return followedItems()
     .filter(i => i.topics.includes(topicId) && !isCompleted(i.id))

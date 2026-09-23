@@ -317,6 +317,34 @@ screens.archive = () => {
 };
 screens.archive.mount = (root) => { $$('.chip[data-tab]', root).forEach(b => b.onclick = () => { archiveTab = b.dataset.tab; render(); }); };
 
+screens.source = (id) => {
+  renderNav('sources');
+  const src = S.sourceById(id);
+  if (!src) return screens.sources();
+  const items = S.itemsForSource(id);
+  const fresh = items.filter(i => S.isFresh(i) && !S.isCompleted(i.id));
+  const older = items.filter(i => !S.isFresh(i) || S.isCompleted(i.id));
+  const f = S.isFollowed(id);
+  const { tone } = imageFor({ img: id });
+  return pageHead(src.name, '', '#/sources').replace('</header>', `
+      <div class="source-hero">
+        <div class="avatar ${src.type === 'youtube' ? 'yt' : ''}" style="--tone:${tone}" aria-hidden="true">${esc(src.name[0])}</div>
+        <div class="t"><p>${esc(src.tagline)}</p><div class="type">${SOURCE_TYPE_LABEL[src.type]}${src.metadataOnly ? ' · Headlines only' : ''} · ${items.length} in your library</div></div>
+        ${src.unavailable ? '' : `<button class="btn sm ${f ? 'ghost' : 'primary'}" data-follow="${id}" aria-pressed="${f}">${f ? 'Following' : 'Follow'}</button>`}
+      </div>
+      <p class="hint" style="margin-top:14px"><a href="${src.home}" target="_blank" rel="noopener">Visit ${esc(src.name)} ${I.ext.replace('<svg', '<svg style="width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:1.8;vertical-align:-2px"')}</a></p>
+    </header>`) +
+    (fresh.length ? `<section class="section"><div class="section-head"><h2 class="kicker">Recent</h2></div><div class="list grid">${fresh.map(i => listRow(i)).join('')}</div></section>` : '')
+    + (older.length ? `<section class="section"><div class="section-head"><h2 class="kicker">Earlier</h2></div><div class="list grid">${older.map(i => listRow(i)).join('')}</div></section>` : '')
+    + (!items.length ? '<div class="empty">Nothing from this source yet.<small>It\u2019ll appear here as they publish.</small></div>' : '');
+};
+screens.source.mount = (root) => {
+  $$('[data-follow]', root).forEach(b => b.onclick = () => {
+    const id = b.dataset.follow; const s = S.sourceById(id); const now = !S.isFollowed(id);
+    S.setFollowed(id, now); haptic(); toast(now ? `Following ${s.name}` : `Unfollowed ${s.name}`, now); render();
+  });
+};
+
 let sourceQuery = '';
 screens.sources = () => {
   renderNav('sources');
@@ -325,7 +353,14 @@ screens.sources = () => {
   const match = (s) => !q || s.name.toLowerCase().includes(q) || s.tagline.toLowerCase().includes(q) || SOURCE_TYPE_LABEL[s.type].toLowerCase().includes(q);
   const followed = all.filter(s => S.isFollowed(s.id) && match(s));
   const discover = all.filter(s => !S.isFollowed(s.id) && match(s));
-  const row = (s) => { const { tone } = imageFor({ img: s.id }); const f = S.isFollowed(s.id); const un = s.unavailable; return `<div class="source-row ${un ? 'unavailable' : ''}"><div class="avatar ${s.type === 'youtube' ? 'yt' : ''}" style="--tone:${tone}" aria-hidden="true">${esc(s.name[0])}</div><div class="t"><h3>${esc(s.name)}</h3><p>${esc(s.tagline)}</p><div class="type">${SOURCE_TYPE_LABEL[s.type]}${un ? ` · <span class="warn">Unavailable — ${esc(un)}</span>` : s.metadataOnly ? ' · Headlines only' : ''}</div></div>${un ? '' : `<button class="btn sm ${f ? 'ghost' : 'primary'}" data-follow="${s.id}" aria-pressed="${f}">${f ? 'Following' : 'Follow'}</button>`}</div>`; };
+  const row = (s) => { const { tone } = imageFor({ img: s.id }); const f = S.isFollowed(s.id); const un = s.unavailable; const n = S.itemsForSource(s.id).length;
+    return `<div class="source-row ${un ? 'unavailable' : ''}">
+      <a class="source-open" href="#/source/${s.id}" aria-label="${esc(s.name)}">
+        <div class="avatar ${s.type === 'youtube' ? 'yt' : ''}" style="--tone:${tone}" aria-hidden="true">${esc(s.name[0])}</div>
+        <div class="t"><h3>${esc(s.name)}</h3><p>${esc(s.tagline)}</p>
+          <div class="type">${SOURCE_TYPE_LABEL[s.type]}${un ? ` · <span class="warn">Unavailable — ${esc(un)}</span>` : s.metadataOnly ? ' · Headlines only' : ''}${n && !un ? ` · ${n} pieces` : ''}</div></div>
+      </a>
+      ${un ? '' : `<button class="btn sm ${f ? 'ghost' : 'primary'}" data-follow="${s.id}" aria-pressed="${f}">${f ? 'Following' : 'Follow'}</button>`}</div>`; };
   return pageHead('Sources', 'You decide who you trust. Curated only ever draws from this list.') +
     `<div class="search">${I.search}<input type="search" id="src-q" placeholder="Search sources…" value="${esc(sourceQuery)}" autocomplete="off"></div>
     ${q && !followed.length && !discover.length ? `<div class="empty">No source called “${esc(sourceQuery)}”.<small>Soon you’ll be able to paste any website or channel URL to follow it.</small></div>` : ''}
@@ -417,7 +452,7 @@ function finishHTML(item) {
   return `<div class="finish">${mode === 'manual' ? '<div class="ttf">Done with this one?</div>' : ''}<button class="btn primary" id="finish">Mark as finished</button></div>`;
 }
 function readerTopHTML(item) {
-  return `<div class="reader-top"><span class="rt-left"><a class="icon-btn" href="#/" id="back" aria-label="Back">${I.back}</a>${brandMark()}</span><span class="src-label">${esc(src(item).name)}</span><span class="rt-right"></span><div class="progress"><i id="rp" style="width:${S.progressOf(item.id) * 100}%"></i></div></div>`;
+  return `<div class="reader-top"><span class="rt-left"><a class="icon-btn" href="#/" id="back" aria-label="Back">${I.back}</a>${brandMark()}</span><a class="src-label" href="#/source/${item.sourceId}">${esc(src(item).name)}</a><span class="rt-right"></span><div class="progress"><i id="rp" style="width:${S.progressOf(item.id) * 100}%"></i></div></div>`;
 }
 
 screens.item = (id) => {
@@ -428,9 +463,14 @@ screens.item = (id) => {
   return item.type === 'video' ? videoHTML(item) : articleHTML(item);
 };
 
+const topicLinks = (item) => (item.topics || [])
+  .map(t => S.topicById(t))
+  .filter(Boolean)
+  .map(t => `<a class="topic" href="#/topic/${t.id}">${esc(t.name)}</a>`)
+  .join('<span class="topic-sep">·</span>');
+
 function articleHTML(item) {
   const p = S.progressOf(item.id);
-  const topics = item.topics.map(t => S.topicById(t).name).join(' · ');
   const hasBody = Array.isArray(item.body) && item.body.length > 0;
   // The drop cap only belongs on a proper opening paragraph, never on a short
   // label like "In short:".
@@ -445,13 +485,13 @@ function articleHTML(item) {
   const handoff = hasBody ? '' : `<div class="handoff"><p>${esc(src(item).name)} publishes this piece on its own site${src(item).metadataOnly ? ' — it’s behind their paywall, so Curated shows you the summary and hands you across' : ''}.</p><a class="btn primary" href="${item.url}" target="_blank" rel="noopener">Read on ${esc(src(item).name)} ${I.ext.replace('<svg', '<svg style="width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.8"')}</a></div>`;
   return readerTopHTML(item) + `<article class="article ${hasBody ? '' : 'handoff-mode'}">
     ${imgHTML(item, 'hero r-16x9', 1200, 675)}
-    <div class="kicker-row"><span>${esc(src(item).name)}</span><span class="topic">${esc(topics)}</span></div>
+    <div class="kicker-row"><a href="#/source/${item.sourceId}">${esc(src(item).name)}</a>${topicLinks(item)}</div>
     <h1>${esc(item.title)}</h1>
     <p class="dek">${esc(item.dek)}</p>
     <div class="byline">${item.author ? `<b>${esc(item.author)}</b><span class="dot">·</span>` : ''}<span>${relTime(item.publishedAt)}</span>${hasBody ? `<span class="dot">·</span><span>${item.readMinutes} min read</span>` : ''}${hasBody && p > 0.04 && !S.isCompleted(item.id) ? `<span class="dot">·</span><span class="hint-cont">Resuming at ${pct(item)}%</span>` : ''}</div>
     ${hasBody ? `<div class="body" id="body">${body}</div><div class="body-end"><span>End</span></div>` : handoff}
     ${finishHTML(item)}
-    <div class="publisher"><div class="t"><b>${esc(src(item).name)}</b><br>Read this piece on the publisher’s site.</div><a class="btn ghost sm" href="${item.url}" target="_blank" rel="noopener">Open ${I.ext.replace('<svg', '<svg style="width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.8"')}</a></div>
+    <div class="publisher"><div class="t"><a href="#/source/${item.sourceId}"><b>${esc(src(item).name)}</b></a><br>Read this piece on the publisher’s site.</div><a class="btn ghost sm" href="${item.url}" target="_blank" rel="noopener">Open ${I.ext.replace('<svg', '<svg style="width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.8"')}</a></div>
     ${notesHTML(item)}
   </article>` + actionBarHTML(item) + notesDrawerHTML(item);
 }
@@ -467,11 +507,11 @@ function videoHTML(item) {
     ${player}
     <div class="scrub"><span id="t-cur">${fmtDur(pos)}</span><input type="range" id="scrub" min="0" max="${dur || 1}" step="1" value="${Math.round(pos)}" style="--pct:${p * 100}%" aria-label="${real ? 'Where you’re up to' : 'Playback position'}"><span>${dur ? fmtDur(dur) : '–:––'}</span></div>
     <p class="mock-note">${real ? 'Drag to mark where you’re up to — Curated remembers it and resumes the video there.' : 'Prototype player — press play to simulate watching, or drag to scrub.'}</p>
-    <div class="video-meta"><h1>${esc(item.title)}</h1><div class="byline"><b>${esc(src(item).name)}</b><span>·</span><span>${relTime(item.publishedAt)}</span><span>·</span><span>${Math.round(item.durationSec / 60)} min</span></div></div>
+    <div class="video-meta"><h1>${esc(item.title)}</h1><div class="byline"><a href="#/source/${item.sourceId}"><b>${esc(src(item).name)}</b></a><span>·</span><span>${relTime(item.publishedAt)}</span><span>·</span><span>${Math.round(item.durationSec / 60)} min</span></div></div>
     <p class="desc">${esc(item.description || item.dek || '')}</p>
     ${(item.chapters || []).length ? `<div class="chapters" id="chapters"><div class="kicker" style="margin-bottom:6px">Chapters</div>${item.chapters.map(([t, name]) => `<button data-t="${t}"><span class="ts">${fmtDur(t)}</span><span>${esc(name)}</span></button>`).join('')}</div>` : ''}
     ${finishHTML(item)}
-    <div class="publisher"><div class="t"><b>${esc(src(item).name)}</b><br>Watch on YouTube.</div><a class="btn ghost sm" href="${item.url}" target="_blank" rel="noopener">Open ${I.ext.replace('<svg', '<svg style="width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.8"')}</a></div>
+    <div class="publisher"><div class="t"><a href="#/source/${item.sourceId}"><b>${esc(src(item).name)}</b></a><br>Watch on YouTube.</div><a class="btn ghost sm" href="${item.url}" target="_blank" rel="noopener">Open ${I.ext.replace('<svg', '<svg style="width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.8"')}</a></div>
     ${notesHTML(item)}
   </article>` + actionBarHTML(item) + notesDrawerHTML(item);
 }
@@ -699,7 +739,7 @@ function render() {
   if (name === 'item') mountReader(root, arg);
   if (backStack[backStack.length - 1] !== hash) backStack.push(hash);
   window.scrollTo({ top: 0, behavior: 'instant' }); // readers restore their own position after this
-  const titles = { home: 'Curated', new: 'All New', topics: 'Topics', topic: 'Topics', saved: 'Saved', sources: 'Sources', reading: 'Currently Reading', archive: 'Archive', settings: 'Settings', notes: 'Notebook' };
+  const titles = { home: 'Curated', new: 'All New', topics: 'Topics', topic: 'Topics', source: 'Sources', saved: 'Saved', sources: 'Sources', reading: 'Currently Reading', archive: 'Archive', settings: 'Settings', notes: 'Notebook' };
   document.title = name === 'item' ? `${S.itemById(arg)?.title || 'Curated'} — Curated` : (titles[name] === 'Curated' ? 'Curated' : `${titles[name] || 'Curated'} — Curated`);
 }
 

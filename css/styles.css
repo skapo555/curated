@@ -600,3 +600,20 @@ select.native { position: absolute; inset: 0; opacity: 0; width: 100%; height: 1
 @media (min-width: 1024px) {
   .notebook { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-items: start; }
 }
+
+/* ---------- Source page ---------- */
+.source-hero { display: flex; align-items: center; gap: 14px; margin-top: 4px; }
+.source-hero .avatar { width: 54px; height: 54px; flex: 0 0 54px; font-size: 24px; }
+.source-hero .t { flex: 1; min-width: 0; }
+.source-hero .t p { font-size: 14px; color: var(--ink-2); line-height: 1.4; }
+.source-hero .t .type { font-size: 11px; color: var(--ink-3); letter-spacing: .06em; text-transform: uppercase; font-weight: 600; margin-top: 5px; }
+.source-row .source-open { display: flex; align-items: center; gap: 14px; flex: 1; min-width: 0; }
+.source-row .source-open:hover h3 { color: var(--accent); }
+
+/* Links in the reader's kicker row and byline */
+.article .kicker-row a { color: var(--accent); }
+.article .kicker-row a.topic { color: var(--ink-3); font-weight: 500; letter-spacing: .04em; text-transform: none; }
+.article .kicker-row a:hover { text-decoration: underline; }
+.article .kicker-row .topic-sep { color: var(--ink-3); margin: 0 6px; }
+.reader-top a.src-label:hover { color: var(--ink); }
+.video-meta .byline a:hover b, .publisher a:hover b { color: var(--accent); }
