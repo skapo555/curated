@@ -64,17 +64,46 @@ export async function sendMagicLink(email) {
    and Safari keep separate storage, so a tapped link signs you into the
    browser and leaves the installed app still locked. Typing the code keeps
    the whole exchange inside whichever one you are actually using. */
-export async function verifyCode(email, code) {
-  const token = String(code || '').replace(/\D/g, '');
-  if (token.length < 6) return { ok: false, error: 'That code is six digits.' };
+export async function verifyCode(email, input) {
+  const raw = String(input || '').trim();
+  // Two ways in, because until custom SMTP is configured Supabase will only
+  // send its default email, which carries a link and no code. Paste that link
+  // here and we exchange its token ourselves — which also solves the real
+  // problem, that on iOS a tapped link opens Safari and signs in the browser
+  // rather than the installed app.
+  let body = null;
+  if (/^\d[\d\s-]*$/.test(raw)) {
+    const token = raw.replace(/\D/g, '');
+    if (token.length !== 6) return { ok: false, error: 'That code is six digits.' };
+    body = { email: email.trim(), token, type: 'email' };
+  } else if (/^https?:\/\//i.test(raw)) {
+    let u; try { u = new URL(raw); } catch (e) { return { ok: false, error: 'That doesn\u2019t look like the link from the email.' }; }
+    const p = new URLSearchParams(u.search);
+    const h = new URLSearchParams((u.hash || '').replace(/^#/, ''));
+    // Some links arrive already exchanged, with the session in the fragment.
+    if (h.get('access_token') && h.get('refresh_token')) {
+      store({
+        access_token: h.get('access_token'), refresh_token: h.get('refresh_token'),
+        expires_at: Date.now() + (Number(h.get('expires_in')) || 3600) * 1000,
+        user: decodeUser(h.get('access_token')),
+      });
+      return { ok: true };
+    }
+    const hash = p.get('token_hash') || p.get('token');
+    if (!hash) return { ok: false, error: 'That link has no sign-in token in it.' };
+    body = { token_hash: hash, type: p.get('type') || 'magiclink' };
+  } else {
+    return { ok: false, error: 'Paste the six-digit code, or the whole link from the email.' };
+  }
+
   const r = await fetch(`${URL_BASE}/auth/v1/verify`, {
     method: 'POST',
     headers: { apikey: ANON_KEY, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: email.trim(), token, type: 'email' }),
+    body: JSON.stringify(body),
   });
   if (r.ok) {
     const d = await r.json();
-    if (!d.access_token || !d.refresh_token) return { ok: false, error: 'That didn\u2019t work. Try the code again.' };
+    if (!d.access_token || !d.refresh_token) return { ok: false, error: 'That didn\u2019t work. Try again.' };
     store({
       access_token: d.access_token, refresh_token: d.refresh_token,
       expires_at: Date.now() + (d.expires_in || 3600) * 1000,
@@ -82,14 +111,15 @@ export async function verifyCode(email, code) {
     });
     return { ok: true };
   }
-  let msg = 'That code didn\u2019t work.';
+  let msg = 'That didn\u2019t work.';
   try {
     const e = await r.json();
-    const raw = e.msg || e.message || e.error_description || '';
-    if (/expired/i.test(raw)) msg = 'That code has expired. Send a new one.';
-    else if (/invalid|incorrect/i.test(raw)) msg = 'That code isn\u2019t right. Check it and try again.';
+    const t = e.msg || e.message || e.error_description || '';
+    if (/expired/i.test(t)) msg = 'That has expired. Send a new one.';
+    else if (/already|used/i.test(t)) msg = 'That link has already been used. Send a new one.';
+    else if (/invalid|incorrect/i.test(t)) msg = 'That isn\u2019t right. Check it and try again.';
     else if (r.status === 429) msg = 'Too many tries. Wait a minute.';
-    else if (raw) msg = raw;
+    else if (t) msg = t;
   } catch (e) { /* keep the generic message */ }
   return { ok: false, error: msg };
 }

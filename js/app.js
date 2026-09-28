@@ -509,7 +509,7 @@ screens.gate = () => {
       <button class="btn primary lg" type="submit" id="signin-go">Send me a code</button>
     </form>
     <form id="code-form" class="gate-form" novalidate hidden>
-      <input id="code-input" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*" maxlength="6" placeholder="000000" aria-label="Six-digit code">
+      <input id="code-input" type="text" inputmode="text" autocomplete="one-time-code" spellcheck="false" placeholder="Code, or paste the link" aria-label="Code or sign-in link">
       <button class="btn primary lg" type="submit" id="code-go">Sign in</button>
       <button type="button" class="link-btn" id="code-back">Use a different address</button>
     </form>
@@ -534,7 +534,7 @@ screens.gate.mount = (root) => {
     go.disabled = false; go.textContent = 'Send me a code';
     if (!r.ok) return say(esc(r.error), 'bad');
     form.hidden = true; codeForm.hidden = false;
-    say(`Sent to <b>${esc(email)}</b>. Enter the six-digit code, or tap the link in the same email.`, 'good');
+    say(`Sent to <b>${esc(email)}</b>. Paste the code if the email has one \u2014 otherwise long-press the link, copy it, and paste that here.`, 'good');
     code.focus();
   };
 
@@ -548,10 +548,11 @@ screens.gate.mount = (root) => {
     boot();   // signed in: load the content and leave the door behind
   };
 
-  // Six digits is the whole form; don't make anyone reach for the button.
+  // Six digits, or a pasted link, is the whole form — submit it without
+  // making anyone reach for the button.
   code.oninput = () => {
-    code.value = code.value.replace(/\D/g, '').slice(0, 6);
-    if (code.value.length === 6) codeForm.requestSubmit();
+    const v = code.value.trim();
+    if (/^\d{6}$/.test(v) || /^https?:\/\/\S+token/i.test(v)) codeForm.requestSubmit();
   };
   $('#code-back', root).onclick = () => {
     codeForm.hidden = true; form.hidden = false; say(''); code.value = ''; input.focus();

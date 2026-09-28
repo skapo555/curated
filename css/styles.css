@@ -747,8 +747,8 @@ body.gated #main { padding-bottom: 0; }
 
 /* One-time code: six digits, spaced so they can be read back. */
 #code-input {
-  text-align: center; font-family: var(--sans); font-size: 26px; font-weight: 600;
-  letter-spacing: .34em; text-indent: .34em; padding: 14px 15px;
+  text-align: center; font-family: var(--sans); font-size: 17px; font-weight: 500;
+  padding: 14px 15px; text-overflow: ellipsis;
 }
-#code-input::placeholder { letter-spacing: .34em; color: var(--ink-3); opacity: .5; }
+#code-input::placeholder { font-size: 15px; font-weight: 400; color: var(--ink-3); opacity: .7; }
 .gate-form .link-btn { align-self: center; margin-top: 4px; }
