@@ -728,6 +728,7 @@ body.gated #main { padding-bottom: 0; }
 .welcome.gate .welcome-head { padding-top: 0; }
 .welcome.gate h1 { font-size: 40px; line-height: 1.08; }
 .gate-form { display: flex; flex-direction: column; gap: 10px; margin-top: 26px; }
+.gate-form[hidden] { display: none; }   /* a class rule otherwise beats the hidden attribute */
 .gate-form input {
   width: 100%; padding: 13px 15px; font-family: var(--sans); font-size: 16px;
   color: var(--ink); background: var(--surface);
@@ -737,3 +738,17 @@ body.gated #main { padding-bottom: 0; }
 .welcome.gate .signin-msg.bad { color: var(--accent); }
 .welcome.gate .signin-msg.good { color: var(--success); }
 .welcome.gate .hint { margin-top: 20px; }
+
+/* The door has no sidebar, so it must not inherit the sidebar's grid column. */
+@media (min-width: 1024px) {
+  body.gated .app { grid-template-columns: 1fr; }
+  body.gated .main { max-width: none; padding: 0; display: grid; place-items: center; }
+}
+
+/* One-time code: six digits, spaced so they can be read back. */
+#code-input {
+  text-align: center; font-family: var(--sans); font-size: 26px; font-weight: 600;
+  letter-spacing: .34em; text-indent: .34em; padding: 14px 15px;
+}
+#code-input::placeholder { letter-spacing: .34em; color: var(--ink-3); opacity: .5; }
+.gate-form .link-btn { align-self: center; margin-top: 4px; }

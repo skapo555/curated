@@ -60,6 +60,40 @@ export async function sendMagicLink(email) {
   return { ok: false, error: msg };
 }
 
+/* The same email also carries a six-digit code. On iOS a home-screen web app
+   and Safari keep separate storage, so a tapped link signs you into the
+   browser and leaves the installed app still locked. Typing the code keeps
+   the whole exchange inside whichever one you are actually using. */
+export async function verifyCode(email, code) {
+  const token = String(code || '').replace(/\D/g, '');
+  if (token.length < 6) return { ok: false, error: 'That code is six digits.' };
+  const r = await fetch(`${URL_BASE}/auth/v1/verify`, {
+    method: 'POST',
+    headers: { apikey: ANON_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: email.trim(), token, type: 'email' }),
+  });
+  if (r.ok) {
+    const d = await r.json();
+    if (!d.access_token || !d.refresh_token) return { ok: false, error: 'That didn\u2019t work. Try the code again.' };
+    store({
+      access_token: d.access_token, refresh_token: d.refresh_token,
+      expires_at: Date.now() + (d.expires_in || 3600) * 1000,
+      user: d.user || decodeUser(d.access_token),
+    });
+    return { ok: true };
+  }
+  let msg = 'That code didn\u2019t work.';
+  try {
+    const e = await r.json();
+    const raw = e.msg || e.message || e.error_description || '';
+    if (/expired/i.test(raw)) msg = 'That code has expired. Send a new one.';
+    else if (/invalid|incorrect/i.test(raw)) msg = 'That code isn\u2019t right. Check it and try again.';
+    else if (r.status === 429) msg = 'Too many tries. Wait a minute.';
+    else if (raw) msg = raw;
+  } catch (e) { /* keep the generic message */ }
+  return { ok: false, error: msg };
+}
+
 /* The link comes back with tokens in the URL fragment. Consume them and tidy
    the address bar so the tokens aren't left sitting in history. */
 export function consumeCallback() {

@@ -275,11 +275,31 @@ screens.topic = (id) => {
     (older.length ? `<section class="section"><div class="section-head"><h2 class="kicker">From the archive</h2></div><div class="list grid">${older.map(i => listRow(i)).join('')}</div></section>` : '');
 };
 
+let savedQuery = '';
 screens.saved = () => {
   renderNav('saved');
-  const items = S.savedItems();
-  return pageHead('Saved', 'Set aside for when you have the time.') +
-    `<div class="list grid">${items.length ? items.map(i => listRow(i)).join('') : '<div class="empty">Nothing saved yet.<small>Tap the bookmark on anything to keep it here.</small></div>'}</div>`;
+  const q = savedQuery.trim().toLowerCase();
+  const all = S.savedItems().filter(i => !q
+    || i.title.toLowerCase().includes(q)
+    || (i.dek || '').toLowerCase().includes(q)
+    || srcName(i).toLowerCase().includes(q));
+  const unread = all.filter(i => !S.isCompleted(i.id));
+  const read = all.filter(i => S.isCompleted(i.id));
+  const group = (label, list) => list.length
+    ? `<section class="section"><div class="section-head"><h2 class="kicker">${label} · ${list.length}</h2></div>
+       <div class="list grid">${list.map(i => listRow(i)).join('')}</div></section>` : '';
+  const empty = S.savedItems().length
+    ? `<div class="empty">Nothing matches \u201c${esc(savedQuery)}\u201d.</div>`
+    : '<div class="empty">Nothing kept yet.<small>Tap the bookmark on anything worth coming back to.</small></div>';
+  return pageHead('Saved', 'Things you kept \u2014 to read, or to find again.') +
+    (S.savedItems().length > 4
+      ? `<div class="search">${I.search}<input type="search" id="saved-q" placeholder="Search what you\u2019ve kept\u2026" value="${esc(savedQuery)}" autocomplete="off"></div>` : '') +
+    (all.length ? group('Still to read', unread) + group('Read', read) : empty);
+};
+screens.saved.mount = (root) => {
+  const input = $('#saved-q', root);
+  if (!input) return;
+  input.oninput = () => { savedQuery = input.value; const pos = input.selectionStart; render(); const el = $('#saved-q'); if (el) { el.focus(); el.setSelectionRange(pos, pos); } };
 };
 
 screens.know = () => {
@@ -486,13 +506,57 @@ screens.gate = () => {
     </header>
     <form id="signin-form" class="gate-form" novalidate>
       <input id="signin-email" type="email" inputmode="email" autocomplete="email" autocapitalize="off" spellcheck="false" placeholder="you@example.com" aria-label="Email address">
-      <button class="btn primary lg" type="submit" id="signin-go">Send me a link</button>
+      <button class="btn primary lg" type="submit" id="signin-go">Send me a code</button>
+    </form>
+    <form id="code-form" class="gate-form" novalidate hidden>
+      <input id="code-input" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*" maxlength="6" placeholder="000000" aria-label="Six-digit code">
+      <button class="btn primary lg" type="submit" id="code-go">Sign in</button>
+      <button type="button" class="link-btn" id="code-back">Use a different address</button>
     </form>
     <p class="signin-msg" id="signin-msg" role="status"></p>
-    <p class="hint">Invite-only for now. If you’re not on the list, no link will arrive.</p>
+    <p class="hint">Invite-only for now. If you\u2019re not on the list, nothing will arrive.</p>
   </div>`;
 };
-screens.gate.mount = (root) => screens.signin.mount(root);
+screens.gate.mount = (root) => {
+  const form = $('#signin-form', root), input = $('#signin-email', root);
+  const codeForm = $('#code-form', root), code = $('#code-input', root);
+  const msg = $('#signin-msg', root), go = $('#signin-go', root), codeGo = $('#code-go', root);
+  let email = '';
+  const say = (text, kind = '') => { msg.innerHTML = text; msg.className = 'signin-msg' + (kind ? ' ' + kind : ''); };
+  input.focus();
+
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    email = input.value.trim();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return say('That doesn\u2019t look like an email address.', 'bad');
+    go.disabled = true; go.textContent = 'Sending\u2026'; say('');
+    const r = await A.sendMagicLink(email);
+    go.disabled = false; go.textContent = 'Send me a code';
+    if (!r.ok) return say(esc(r.error), 'bad');
+    form.hidden = true; codeForm.hidden = false;
+    say(`Sent to <b>${esc(email)}</b>. Enter the six-digit code, or tap the link in the same email.`, 'good');
+    code.focus();
+  };
+
+  codeForm.onsubmit = async (e) => {
+    e.preventDefault();
+    codeGo.disabled = true; codeGo.textContent = 'Checking\u2026';
+    const r = await A.verifyCode(email, code.value);
+    codeGo.disabled = false; codeGo.textContent = 'Sign in';
+    if (!r.ok) { say(esc(r.error), 'bad'); code.select(); return; }
+    say('');
+    boot();   // signed in: load the content and leave the door behind
+  };
+
+  // Six digits is the whole form; don't make anyone reach for the button.
+  code.oninput = () => {
+    code.value = code.value.replace(/\D/g, '').slice(0, 6);
+    if (code.value.length === 6) codeForm.requestSubmit();
+  };
+  $('#code-back', root).onclick = () => {
+    codeForm.hidden = true; form.hidden = false; say(''); code.value = ''; input.focus();
+  };
+};
 
 screens.sources = () => {
   renderNav('sources');
@@ -708,7 +772,7 @@ function notesDrawerHTML(item) {
 function actionBarHTML(item) {
   const fb = S.feedbackOf(item.id);
   return `<div class="actionbar" role="toolbar" aria-label="Actions">
-    <button id="a-save" aria-pressed="${S.isSaved(item.id)}" aria-label="Save">${I.bookmark}</button>
+    <button id="a-save" aria-pressed="${S.isSaved(item.id)}" aria-label="Keep this">${I.bookmark}</button>
     <span class="sep"></span>
     <button id="a-up" aria-pressed="${fb === 'up'}" aria-label="More like this">${I.up}</button>
     <span class="sep"></span>
@@ -793,7 +857,7 @@ function mountReader(root, id) {
   back.onclick = (e) => { e.preventDefault(); goBack(); };
 
   // Actions
-  $('#a-save', root).onclick = (e) => { const on = S.toggleSaved(id); e.currentTarget.setAttribute('aria-pressed', on); haptic(); toast(on ? 'Saved for later' : 'Removed from Saved', on); };
+  $('#a-save', root).onclick = (e) => { const on = S.toggleSaved(id); e.currentTarget.setAttribute('aria-pressed', on); haptic(); toast(on ? 'Kept' : 'Removed from Saved', on); };
   $('#a-up', root).onclick = (e) => { const fb = S.setFeedback(id, 'up'); e.currentTarget.setAttribute('aria-pressed', fb === 'up'); haptic(); if (fb) toast('Noted — more like this from your sources', true); };
   const typeBtn = $('#a-type', root);
   if (typeBtn) typeBtn.onclick = () => {
@@ -869,19 +933,28 @@ function mountNotes(root, item) {
   // Quote a selection from the piece into the notes.
   const bodyEl = $('#body', root) || $('.desc', root);
   let selTimer;
+  // Hold onto the passage as soon as it is selected. Pressing the mouse down
+  // on the button collapses the selection, so reading it back on click finds
+  // nothing — which is why the button used to do nothing on a laptop.
+  let pendingQuote = '';
   const onSel = () => { clearTimeout(selTimer); selTimer = setTimeout(() => {
     const sel = document.getSelection();
     const text = sel && !sel.isCollapsed ? sel.toString().trim() : '';
-    if (!text || !bodyEl || !bodyEl.contains(sel.anchorNode)) { quoteBtn.hidden = true; return; }
+    if (!text || !bodyEl || !bodyEl.contains(sel.anchorNode)) { quoteBtn.hidden = true; pendingQuote = ''; return; }
+    pendingQuote = text.replace(/\s+/g, ' ');
     const r = sel.getRangeAt(0).getBoundingClientRect();
     quoteBtn.hidden = false;
     quoteBtn.style.left = `${Math.max(12, Math.min(window.innerWidth - 90, r.left + r.width / 2 - 36))}px`;
     quoteBtn.style.top = `${Math.max(8, r.top - 44)}px`;
   }, 120); };
   document.addEventListener('selectionchange', onSel);
+  // Keep the selection alive through the press itself.
+  quoteBtn.addEventListener('pointerdown', (e) => e.preventDefault());
+  quoteBtn.addEventListener('mousedown', (e) => e.preventDefault());
   quoteBtn.onclick = () => {
-    const text = document.getSelection().toString().trim().replace(/\s+/g, ' ');
+    const text = pendingQuote;
     if (!text) return;
+    pendingQuote = '';
     quoteBtn.hidden = true; document.getSelection().removeAllRanges(); setMode('open');
     // Markdown blockquote: the passage, then room to answer it. Notes export
     // as .md, so this is the same shape on the page and in the file.
