@@ -690,6 +690,7 @@ const askedThisSession = new Set();
    drawn deterministically from the piece's id so they stay put while you read
    it and differ from one piece to the next. Grouped so you always get one of
    each kind rather than four variations on doubt. */
+const COARSE = window.matchMedia('(hover: none) and (pointer: coarse)');
 const PROMPT_POOL = {
   argument: [
     'What is the author’s main argument?',
@@ -943,25 +944,38 @@ function mountNotes(root, item) {
     const text = sel && !sel.isCollapsed ? sel.toString().trim() : '';
     if (!text || !bodyEl || !bodyEl.contains(sel.anchorNode)) { quoteBtn.hidden = true; pendingQuote = ''; return; }
     pendingQuote = text.replace(/\s+/g, ' ');
-    const r = sel.getRangeAt(0).getBoundingClientRect();
     quoteBtn.hidden = false;
-    quoteBtn.style.left = `${Math.max(12, Math.min(window.innerWidth - 90, r.left + r.width / 2 - 36))}px`;
-    quoteBtn.style.top = `${Math.max(8, r.top - 44)}px`;
+    // iOS puts its own Copy / Look Up / Translate bar right on top of the
+    // selection and draws it above the page, so a button there cannot be
+    // tapped. On touch we pin ours above the action bar instead, where
+    // nothing competes with it and a thumb can reach it.
+    if (COARSE.matches) {
+      quoteBtn.classList.add('pinned');
+      quoteBtn.style.left = quoteBtn.style.top = '';
+    } else {
+      const r = sel.getRangeAt(0).getBoundingClientRect();
+      quoteBtn.classList.remove('pinned');
+      quoteBtn.style.left = `${Math.max(12, Math.min(window.innerWidth - 90, r.left + r.width / 2 - 36))}px`;
+      quoteBtn.style.top = `${Math.max(8, r.top - 44)}px`;
+    }
   }, 120); };
   document.addEventListener('selectionchange', onSel);
   // Keep the selection alive through the press itself.
-  quoteBtn.addEventListener('pointerdown', (e) => e.preventDefault());
-  quoteBtn.addEventListener('mousedown', (e) => e.preventDefault());
+  quoteBtn.addEventListener('pointerdown', (e) => { if (e.pointerType !== 'touch') e.preventDefault(); });
+  quoteBtn.addEventListener('mousedown', (e) => { if (!COARSE.matches) e.preventDefault(); });
   quoteBtn.onclick = () => {
     const text = pendingQuote;
     if (!text) return;
     pendingQuote = '';
-    quoteBtn.hidden = true; document.getSelection().removeAllRanges(); setMode('open');
+    quoteBtn.hidden = true; quoteBtn.classList.remove('pinned');
+    document.getSelection().removeAllRanges(); setMode('open');
     // Markdown blockquote: the passage, then room to answer it. Notes export
     // as .md, so this is the same shape on the page and in the file.
     append(`> ${text}\n\n`); haptic();
   };
-  window.addEventListener('scroll', () => { if (!quoteBtn.hidden) quoteBtn.hidden = true; }, { passive: true });
+  window.addEventListener('scroll', () => {
+    if (!quoteBtn.hidden && !COARSE.matches) quoteBtn.hidden = true;
+  }, { passive: true });
 
   // Keep the drawer above the on-screen keyboard (iOS keeps fixed elements behind it otherwise).
   const vv = window.visualViewport;

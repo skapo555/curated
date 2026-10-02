@@ -304,6 +304,16 @@ EMAIL_INVITE = re.compile(r"[\w.+-]+@[\w-]+\.[\w.]+")
 NAV_TOKENS = ("close", "sign in", "log in", "members", "search", "home page", "about us", "contact us",
               "subscriptions", "advertise", "write for us", "all sections", "skip to content", "menu")
 PROMO_ANY = re.compile(r"\b(gain access to|access to content|become a member|join .{0,40} and gain|start your (free )?trial)\b", re.I)
+# A house ad for the publisher's own newsletter, dropped mid-article and
+# written as ordinary prose so none of the patterns above catch it. SBS runs
+# one in every piece: "Your trusted source for... straight to your inbox."
+PROMO_PITCH = re.compile(
+    r"\b(straight to your inbox|delivered to your inbox|in your inbox|"
+    r"sign up (to|for) (our|the) [\w ]{0,24}(newsletter|briefing|bulletin|digest)|"
+    r"free daily (news )?(updates|newsletter|briefing)|"
+    r"subscribe to (our|the) [\w ]{0,24}(newsletter|podcast|channel)|"
+    r"never miss (a|an) [\w ]{0,20}(story|update|edition)|"
+    r"download the \w+ app|follow us on)\b", re.I)
 
 def is_nav(text):
     """Menu labels and tagline soup: mostly Capitalised words with almost no
@@ -348,7 +358,12 @@ def tidy(blocks):
             if len(t) > 300 and b["t"] == "p": skipping = False   # real prose resumes
             else: continue
         if BOILERPLATE.match(t) or NAV_PARA.match(t): continue
-        if b["t"] == "p" and (PROMO_PARA.match(t) or PROMO_ANY.search(t) or is_nav(t)): continue
+        if b["t"] == "p" and (PROMO_PARA.match(t) or PROMO_ANY.search(t) or is_nav(t)
+                              or (len(t) < 400 and PROMO_PITCH.search(t))):
+            # The pitch usually sits under its own heading. Take that with it,
+            # or the article is left with a title and nothing beneath it.
+            if out and out[-1]["t"] != "p": out.pop()
+            continue
         if b["t"] == "p" and len(t) < 300 and EMAIL_INVITE.search(t): continue
         if b["t"] == "p" and len(t) < 25 and not seen_body: continue  # captions/kickers before the text starts
         if b["t"] == "p" and len(t) > 200:
