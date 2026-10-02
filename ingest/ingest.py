@@ -340,7 +340,47 @@ def similar(a, b):
 
 CAPTION = re.compile(r"\((?:[^()]*\b(?:getty|unsplash|aap|reuters|afp|ap photo|flickr|wikimedia|shutterstock|supplied|epa|bloomberg)\b[^()]*)\)\s*$", re.I)
 RELATED_STUB = re.compile(r"\b\d{1,2} (january|february|march|april|may|june|july|august|september|october|november|december) 20\d\d\b", re.I)
+# Furniture each publisher wraps around every piece: sales pitches, paywall
+# interstitials, "read this too" stubs and author-bio headings. Found by
+# looking for blocks that repeat across articles from the same source — real
+# prose never does. Deliberately NOT here: crisis-support numbers, funding
+# acknowledgements, conflict-of-interest disclosures and "originally appeared
+# in", which are all worth keeping.
+HOUSE_AD = re.compile(
+    r"(how can we help\?\s*get in touch"                      # Asialink
+    r"|get in touch to discuss how we can help"
+    r"|research and analyses now available on telegram"        # ORF
+    r"|the views expressed above belong to the author"
+    r"|exclusively written for gateway house"                  # Gateway House
+    r"|support our work here"
+    r"|enjoying this article\?"                                # The Diplomat
+    r"|get to the bottom of the story"
+    r"|get unlimited access to in-depth analysis"
+    r"|already have an account\?\s*log in"
+    r"|you can subscribe to .{0,40} podcast on apple podcasts"
+    r")", re.I)
+# "Also Read | Why India must reset BRICS" — an inline link to another piece.
+INLINE_RELATED = re.compile(r"^(also read|read more|see also|related reading)\s*[|:\u2014-]", re.I)
+# A stray dateline that leaked in as prose: "21 September 20264 min read".
+DATE_READTIME = re.compile(r"^\d{1,2} [A-Za-z]+ \d{4}\s*\d+\s*min read$", re.I)
+AUTHOR_HEADING = re.compile(r"^(about the author|the author|author)s?$", re.I)
+
 NAV_PARA = re.compile(r"^(topics|research|interactives|events|people|support us|home|menu|search)(\s+\w+){0,12}$", re.I)
+
+def is_furniture(tag, t):
+    """Publisher wrapping rather than the piece itself. Judged on the text, not
+    the tag, because the same pitch arrives as a heading, a paragraph or a
+    pull-quote depending on the site."""
+    if HOUSE_AD.search(t): return True
+    if INLINE_RELATED.match(t): return True
+    if DATE_READTIME.match(t): return True
+    if AUTHOR_HEADING.match(t): return True
+    # "The post X appeared first on Y." — WordPress stamps this on full-text
+    # feeds. It was only ever stripped from the dek, never from the body.
+    if WP_FEED_TAIL.match(t): return True
+    if tag == "p" and len(t) < 400 and PROMO_PITCH.search(t): return True
+    if tag == "p" and (PROMO_PARA.match(t) or PROMO_ANY.search(t)): return True
+    return False
 
 def tidy(blocks):
     out, skipping, long_paras = [], False, 0
@@ -358,11 +398,12 @@ def tidy(blocks):
             if len(t) > 300 and b["t"] == "p": skipping = False   # real prose resumes
             else: continue
         if BOILERPLATE.match(t) or NAV_PARA.match(t): continue
-        if b["t"] == "p" and (PROMO_PARA.match(t) or PROMO_ANY.search(t) or is_nav(t)
-                              or (len(t) < 400 and PROMO_PITCH.search(t))):
-            # The pitch usually sits under its own heading. Take that with it,
-            # or the article is left with a title and nothing beneath it.
-            if out and out[-1]["t"] != "p": out.pop()
+        if b["t"] == "p" and is_nav(t): continue
+        if is_furniture(b["t"], t):
+            # A pitch usually sits under its own heading. Take that with it, or
+            # the article is left with a title and nothing beneath it.
+            if b["t"] == "p" and out and out[-1]["t"] != "p" and not out[-1]["text"].strip().endswith((".", "?", "!")):
+                out.pop()
             continue
         if b["t"] == "p" and len(t) < 300 and EMAIL_INVITE.search(t): continue
         if b["t"] == "p" and len(t) < 25 and not seen_body: continue  # captions/kickers before the text starts

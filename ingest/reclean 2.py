@@ -7,20 +7,22 @@ rather than re-downloading a month of pages.
 """
 import json, os, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from ingest import is_furniture, ITEMS_DIR
+from ingest import PROMO_PITCH, PROMO_PARA, PROMO_ANY, is_nav, ITEMS_DIR, DATA
 
 def clean(blocks):
     out, dropped = [], 0
     for b in blocks:
         t = (b.get("text") or "").strip()
-        if t and is_furniture(b.get("t"), t):
-            if (b.get("t") == "p" and out and out[-1]["t"] != "p"
-                    and not out[-1]["text"].strip().endswith((".", "?", "!"))):
+        if b.get("t") == "p" and t and (
+            (len(t) < 400 and PROMO_PITCH.search(t)) or PROMO_PARA.match(t) or PROMO_ANY.search(t)
+        ):
+            if out and out[-1]["t"] != "p":
                 out.pop(); dropped += 1          # its heading goes too
             dropped += 1
             continue
         out.append(b)
-    while out and out[-1]["t"] != "p":           # never leave a heading dangling
+    # never leave a heading dangling at the end
+    while out and out[-1]["t"] != "p":
         out.pop(); dropped += 1
     return out, dropped
 
