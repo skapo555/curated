@@ -167,6 +167,20 @@ def page_meta(page, url):
     return meta
 
 SEEN_FILE = os.path.join(DATA, "seen.json")
+REJECTED_FILE = os.path.join(DATA, "rejected.json")
+
+def load_rejected():
+    """URLs we have already downloaded and decided against.
+
+    Whether a piece clears a source's length floor can only be known after
+    fetching it, so a rejection costs one download. Without a record of the
+    verdict it costs one download *every run* — which for ABC and Inside Story
+    was about thirty pages every half hour, forever. That is both wasteful and
+    a broken promise: this file claims one fetch per article, ever.
+    """
+    try:
+        with open(REJECTED_FILE) as f: return json.load(f)
+    except Exception: return {}
 
 def load_seen():
     """Publication dates for sitemap URLs we have already looked at. Without
@@ -603,6 +617,8 @@ def main():
     items, source_status = [], {}
     budget = Budget(FETCH_BUDGET)
     seen = load_seen()
+    rejected = load_rejected()
+    rejected_before = len(rejected)
 
     for src in sources:
         if src.get("unavailable"):
@@ -635,6 +651,8 @@ def main():
             item_file = os.path.join(ITEMS_DIR, iid + ".json")
             if existing and os.path.exists(item_file):
                 items.append(existing); count += 1; continue
+            if e["url"] in rejected:
+                continue  # already downloaded once and judged; don't pay again
             # a sitemap source has already spent its fetch reading the page
             if e.get("page") is None and not budget.take():
                 continue  # picked up next run
@@ -680,6 +698,7 @@ def main():
                 log("   ! skipped:", title[:60], ex); continue
             item["worth"] = worth_for(src, item)
             if not passes_source_rules(src, item, e):
+                rejected[e["url"]] = datetime.now(timezone.utc).isoformat()
                 log(f"   - {title[:60]} (outside this source's remit)")
                 continue
             with open(item_file, "w") as f: json.dump(detail, f, ensure_ascii=False)
@@ -700,6 +719,12 @@ def main():
     }
     with open(idx_path, "w") as f: json.dump(index, f, ensure_ascii=False)
     with open(SEEN_FILE, "w") as f: json.dump(seen, f)
+    # Forget rejections older than the window: if a piece has aged out of the
+    # feed it will never be offered again, and the ledger shouldn't grow forever.
+    cut = (datetime.now(timezone.utc) - timedelta(days=WINDOW_DAYS * 2)).isoformat()
+    rejected = {u: t for u, t in rejected.items() if t > cut}
+    with open(REJECTED_FILE, "w") as f: json.dump(rejected, f)
+    log(f"rejected ledger: {len(rejected)} urls ({len(rejected) - rejected_before:+d} this run)")
     log(f"\n{len(items)} items, {budget.used} fetched this run, {len(sources)} sources → data/index.json")
 
 if __name__ == "__main__":

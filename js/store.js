@@ -200,6 +200,17 @@ export function itemsForTopic(topicId) {
    Signals: editorial worth, freshness, explicit 👍/👎 by topic and source,
    what the user finishes, plus a small day-seeded jitter so the trio is
    stable through the day but not identical every day. */
+/* How much weight to give evidence. A raw tally grows without limit: after a
+   hundred finished articles it reached roughly 10 against a `worth` of 1-5,
+   so reading history drowned out everything else and the thing quietly became
+   the filter bubble this product exists not to be. Squashing each tally to
+   x/(|x|+SOFTEN) keeps it bounded, lets it grow with evidence, and makes it
+   saturate instead of running away. */
+const SOFTEN = 4;
+const TOPIC_PULL = 1.5;   // most an item's subjects can move it
+const SOURCE_PULL = 1.0;  // most a masthead can move it
+const squash = (x) => x / (Math.abs(x) + SOFTEN);
+
 function affinities() {
   const topic = {}, source = {};
   const bump = (obj, k, v) => { obj[k] = (obj[k] || 0) + v; };
@@ -218,6 +229,8 @@ function affinities() {
     const it = itemById(id); if (!it) continue;
     it.topics.forEach(t => bump(topic, t, 0.3));
   }
+  for (const k of Object.keys(topic)) topic[k] = squash(topic[k]);
+  for (const k of Object.keys(source)) source[k] = squash(source[k]);
   return { topic, source };
 }
 
@@ -250,8 +263,9 @@ export function worthYourTime(n = state.settings.pickCount || 3) {
   const pool = allNew().filter(i => i.worth > 0 && !isStarted(i.id) && !isSaved(i.id) && feedbackOf(i.id) !== 'down');
 
   const scored = pool.map(item => {
-    let topicBoost = 0; item.topics.forEach(t => { topicBoost += aff.topic[t] || 0; });
-    const sourceBoost = aff.source[item.sourceId] || 0;
+    const ts = item.topics.map(t => aff.topic[t] || 0);
+    const topicBoost = (ts.length ? ts.reduce((a, b) => a + b, 0) / ts.length : 0) * TOPIC_PULL;
+    const sourceBoost = (aff.source[item.sourceId] || 0) * SOURCE_PULL;
     const seenBefore = state.surfaced[item.id] && state.surfaced[item.id] !== today;
     return {
       item,
@@ -383,8 +397,8 @@ function reasonFor({ item, hours, topicBoost, sourceBoost }, aff) {
   const src = sourceById(item.sourceId);
   if (hours <= 14) return 'Published today';
   if (hours <= 24) return 'Published in the last day';
-  if (sourceBoost >= 1.5) return `You tend to finish ${src.name}`;
-  if (topicBoost >= 1.5) {
+  if (sourceBoost >= 0.5) return `You tend to finish ${src.name}`;
+  if (topicBoost >= 0.6) {
     const best = item.topics.slice().sort((a, b) => (aff.topic[b] || 0) - (aff.topic[a] || 0))[0];
     const t = topicById(best);
     if (t) return `More on ${t.name}, as you asked`;
