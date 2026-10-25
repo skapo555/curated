@@ -1082,10 +1082,16 @@ function route() {
   return { name, arg: parts[1] ? decodeURIComponent(parts[1]) : null, hash: h };
 }
 
+/* render() is called both to go somewhere new and to refresh where you already
+   are — a sync finishing, a setting changing, a Follow button flipping. Only
+   the first should send you back to the top. */
+let lastView = null;
+
 function render() {
   let { name, arg, hash } = route();
   // Nothing here is public. Everything else waits behind this.
   if (!A.isSignedIn()) {
+    lastView = 'gate';
     const root = $('#main');
     root.innerHTML = screens.gate();
     screens.gate.mount(root);
@@ -1095,6 +1101,11 @@ function render() {
   // Nothing is chosen for you: a device that hasn't picked its sources
   // sees the picker first, whatever it asked for.
   if (CONTENT.live && !S.isOnboarded() && name !== 'welcome') { name = 'welcome'; arg = null; }
+  // Keyed on the screen actually shown, not just the address: finishing the
+  // source picker lands on the same #/ it started from, and must open at the top.
+  const view = `${name}|${hash}`;
+  const keepPlace = view === lastView && name !== 'item';   // readers restore their own position
+  const y = window.scrollY;
   if (reader) { reader.cleanup(); reader = null; }
   const prevRoot = $('#main'); if (prevRoot._notesCleanup) { prevRoot._notesCleanup(); prevRoot._notesCleanup = null; }
   document.body.classList.remove('reading', 'notes-open', 'notes-min');
@@ -1115,7 +1126,8 @@ function render() {
   $$('.img img', root).forEach(im => { if (im.complete && im.naturalWidth > 0) im.classList.add('loaded'); });
   if (name === 'item') mountReader(root, arg);
   if (backStack[backStack.length - 1] !== hash) backStack.push(hash);
-  window.scrollTo({ top: 0, behavior: 'instant' }); // readers restore their own position after this
+  window.scrollTo({ top: keepPlace ? y : 0, behavior: 'instant' }); // readers restore their own position after this
+  lastView = view;
   const titles = { home: 'Curated', new: 'All New', topics: 'Topics', topic: 'Topics', source: 'Sources', saved: 'Saved', sources: 'Sources', reading: 'Currently Reading', archive: 'Archive', settings: 'Settings', notes: 'Notebook', signin: 'Sign in', know: 'In the Know' };
   document.title = name === 'item' ? `${S.itemById(arg)?.title || 'Curated'} — Curated` : (titles[name] === 'Curated' ? 'Curated' : `${titles[name] || 'Curated'} — Curated`);
 }
